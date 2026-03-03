@@ -29,6 +29,7 @@ public:
     void te_off();
     uint16_t width();
     uint16_t height();
+    esp_lcd_panel_handle_t get_panel_handle() const { return panel_handle; }
 
 private:
     int8_t _lcd_rst;

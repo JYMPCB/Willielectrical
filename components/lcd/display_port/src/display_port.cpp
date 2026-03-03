@@ -5,6 +5,7 @@
 #include "lv_conf.h"
 #include "lvgl.h"
 #include "esp_log.h"
+#include "esp_lcd_mipi_dsi.h"
 #include "pins_config.h"
 #include "jd9165_lcd.h"
 #include "gt911_touch.h"
@@ -21,6 +22,18 @@ static lv_color_t *buf  = nullptr;
 static lv_color_t *buf1 = nullptr;
 
 static volatile bool s_flush_enabled = true;
+static bool s_async_flush_cb_registered = false;
+
+static bool lcd_color_trans_done_cb(esp_lcd_panel_handle_t panel, esp_lcd_dpi_panel_event_data_t *edata, void *user_ctx)
+{
+  (void)panel;
+  (void)edata;
+  lv_disp_drv_t *disp_drv = (lv_disp_drv_t *)user_ctx;
+  if (disp_drv) {
+    lv_disp_flush_ready(disp_drv);
+  }
+  return false;
+}
 
 // --- flush (igual a tu código) ---
 static void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p)
@@ -36,6 +49,10 @@ static void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t
   const int offsety2 = area->y2;
 
   esp_err_t err = lcd.lcd_draw_bitmap(offsetx1, offsety1, offsetx2 + 1, offsety2 + 1, (uint16_t*)color_p);
+  if (err == ESP_OK && s_async_flush_cb_registered) {
+    return;
+  }
+
   if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
     ESP_LOGW(TAG, "lcd_draw_bitmap failed: %s", esp_err_to_name(err));
   }
@@ -118,6 +135,20 @@ bool display_port_init(void)
 
   ESP_LOGI(TAG, "disp_drv_register");
   lv_disp_drv_register(&disp_drv);
+
+  esp_lcd_panel_handle_t panel = lcd.get_panel_handle();
+  if (panel) {
+    esp_lcd_dpi_panel_event_callbacks_t cbs = {};
+    cbs.on_color_trans_done = lcd_color_trans_done_cb;
+    esp_err_t cb_err = esp_lcd_dpi_panel_register_event_callbacks(panel, &cbs, &disp_drv);
+    if (cb_err == ESP_OK) {
+      s_async_flush_cb_registered = true;
+      ESP_LOGI(TAG, "DPI on_color_trans_done callback registered");
+    } else {
+      s_async_flush_cb_registered = false;
+      ESP_LOGW(TAG, "DPI callback registration failed: %s", esp_err_to_name(cb_err));
+    }
+  }
 
   ESP_LOGI(TAG, "indev_register");
   static lv_indev_drv_t indev_drv;
