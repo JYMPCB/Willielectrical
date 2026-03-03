@@ -22,6 +22,7 @@
 
 // ---------- Config ----------
 static const uint32_t OTA_HTTP_TIMEOUT_MS = 15000;
+static const uint32_t OTA_HTTP_STALL_TIMEOUT_MS = 30000;
 static volatile bool s_cancel_req = false;
 static const char *TAG = "ota_mgr";
 static httpd_handle_t s_httpd = NULL;
@@ -407,20 +408,57 @@ static void ota_start_task(void* pv) {
   }
 
   ota_apply_auth_headers(client);
+  esp_err_t err;
+  int content_length = 0;
+  int http_status = 0;
+  int redirect_count = 0;
 
-  esp_err_t err = esp_http_client_open(client, 0);
-  if (err != ESP_OK) {
-    ESP_LOGE(TAG, "esp_http_client_open failed: %s", esp_err_to_name(err));
-    esp_http_client_cleanup(client);
-    set_status("HTTP open fail");
-    g_ota_active = false;
-    vTaskDelete(NULL);
-    return;
-  }
+  while (true) {
+    err = esp_http_client_open(client, 0);
+    if (err != ESP_OK) {
+      ESP_LOGE(TAG, "esp_http_client_open failed: %s", esp_err_to_name(err));
+      esp_http_client_cleanup(client);
+      set_status("HTTP open fail");
+      g_ota_active = false;
+      vTaskDelete(NULL);
+      return;
+    }
 
-  int content_length = esp_http_client_fetch_headers(client);
-  if (content_length <= 0) {
-    content_length = 0;
+    content_length = esp_http_client_fetch_headers(client);
+    if (content_length < 0) content_length = 0;
+    http_status = esp_http_client_get_status_code(client);
+
+    if (http_status == 301 || http_status == 302 || http_status == 303 || http_status == 307 || http_status == 308) {
+      if (redirect_count >= 5) {
+        ESP_LOGE(TAG, "Too many redirects while OTA download");
+        esp_http_client_close(client);
+        esp_http_client_cleanup(client);
+        set_status("HTTP redirect fail");
+        g_ota_active = false;
+        vTaskDelete(NULL);
+        return;
+      }
+
+      ESP_LOGW(TAG, "OTA redirect HTTP %d (step %d)", http_status, redirect_count + 1);
+      set_status("Siguiendo servidor...");
+      esp_http_client_set_redirection(client);
+      esp_http_client_close(client);
+      ota_apply_auth_headers(client);
+      redirect_count++;
+      continue;
+    }
+
+    if (http_status != 200) {
+      ESP_LOGE(TAG, "OTA HTTP status not OK: %d", http_status);
+      esp_http_client_close(client);
+      esp_http_client_cleanup(client);
+      set_status("HTTP bin error");
+      g_ota_active = false;
+      vTaskDelete(NULL);
+      return;
+    }
+
+    break;
   }
 
   const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
@@ -450,30 +488,66 @@ static void ota_start_task(void* pv) {
   uint8_t buffer[1024];
   int total_read = 0;
   bool failed = false;
+  const char *fail_status = "OTA fallo";
+  int64_t last_progress_us = esp_timer_get_time();
 
   while (true) {
     if (s_cancel_req) {
       set_status("Cancelado");
       failed = true;
+      fail_status = "Cancelado";
       break;
     }
 
     int read_len = esp_http_client_read(client, (char *)buffer, sizeof(buffer));
+    if (read_len == -ESP_ERR_HTTP_EAGAIN) {
+      int64_t stall_ms = (esp_timer_get_time() - last_progress_us) / 1000;
+      if (stall_ms > OTA_HTTP_STALL_TIMEOUT_MS) {
+        ESP_LOGE(TAG, "OTA stalled for %lld ms", stall_ms);
+        set_status("Descarga timeout");
+        fail_status = "Descarga timeout";
+        failed = true;
+        break;
+      }
+      vTaskDelay(pdMS_TO_TICKS(20));
+      continue;
+    }
+
     if (read_len < 0) {
+      ESP_LOGE(TAG, "esp_http_client_read failed: %d", read_len);
+      set_status("HTTP read fail");
+      fail_status = "HTTP read fail";
       failed = true;
       break;
     }
+
     if (read_len == 0) {
+      if (!esp_http_client_is_complete_data_received(client)) {
+        int64_t stall_ms = (esp_timer_get_time() - last_progress_us) / 1000;
+        if (stall_ms > OTA_HTTP_STALL_TIMEOUT_MS) {
+          ESP_LOGE(TAG, "OTA incomplete/stalled for %lld ms", stall_ms);
+          set_status("Descarga timeout");
+          fail_status = "Descarga timeout";
+          failed = true;
+          break;
+        }
+        vTaskDelay(pdMS_TO_TICKS(20));
+        continue;
+      }
       break;
     }
 
     err = esp_ota_write(ota_handle, buffer, (size_t)read_len);
     if (err != ESP_OK) {
+      ESP_LOGE(TAG, "esp_ota_write failed: %s", esp_err_to_name(err));
+      set_status("OTA write fail");
+      fail_status = "OTA write fail";
       failed = true;
       break;
     }
 
     total_read += read_len;
+    last_progress_us = esp_timer_get_time();
     if (content_length > 0) {
       int p = (total_read * 100) / content_length;
       if (p < 0) p = 0;
@@ -498,7 +572,7 @@ static void ota_start_task(void* pv) {
   esp_http_client_cleanup(client);
 
   if (failed) {
-    set_status("OTA fallo");
+    set_status(fail_status);
     g_ota_active = false;
     vTaskDelete(NULL);
     return;

@@ -108,6 +108,8 @@ void ui_CONFIG_screen_init(void)
     ui_Panel7 = lv_obj_create(ui_CONFIG);
     lv_obj_set_width(ui_Panel7, 382);
     lv_obj_set_height(ui_Panel7, 306);
+    lv_obj_set_x(ui_Panel7, 0);
+    lv_obj_set_y(ui_Panel7, -1);
     lv_obj_set_align(ui_Panel7, LV_ALIGN_TOP_MID);
     lv_obj_set_flex_flow(ui_Panel7, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(ui_Panel7, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
@@ -216,9 +218,9 @@ void ui_CONFIG_screen_init(void)
 
     ui_btnWifi = lv_btn_create(ui_CONFIG);
     lv_obj_set_height(ui_btnWifi, 72);
-    lv_obj_set_width(ui_btnWifi, lv_pct(38));
+    lv_obj_set_width(ui_btnWifi, lv_pct(28));
     lv_obj_set_x(ui_btnWifi, lv_pct(0));
-    lv_obj_set_y(ui_btnWifi, lv_pct(4));
+    lv_obj_set_y(ui_btnWifi, lv_pct(-7));
     lv_obj_set_align(ui_btnWifi, LV_ALIGN_CENTER);
     lv_obj_add_flag(ui_btnWifi, LV_OBJ_FLAG_CHECKABLE);     /// Flags
     lv_obj_set_style_radius(ui_btnWifi, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -241,7 +243,7 @@ void ui_CONFIG_screen_init(void)
     lv_obj_set_width(ui_lblInfo, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_lblInfo, LV_SIZE_CONTENT);    /// 1
     lv_obj_set_x(ui_lblInfo, lv_pct(0));
-    lv_obj_set_y(ui_lblInfo, lv_pct(-13));
+    lv_obj_set_y(ui_lblInfo, lv_pct(-18));
     lv_obj_set_align(ui_lblInfo, LV_ALIGN_CENTER);
     lv_label_set_long_mode(ui_lblInfo, LV_LABEL_LONG_SCROLL_CIRCULAR);
     lv_label_set_text(ui_lblInfo, "");

@@ -3,12 +3,12 @@ idf_component_register(
     "src/events.cpp"
   INCLUDE_DIRS
     "include"
+    "../ui"
   REQUIRES
     willi_common
     app
     training
     ota
     audio
-    ui
     lvgl
 )

@@ -14,6 +14,7 @@ extern "C" {
 extern void ui_HOME_screen_init(void);
 extern void ui_HOME_screen_destroy(void);
 extern lv_obj_t * ui_HOME;
+extern lv_obj_t * ui_Image2;
 extern lv_obj_t * ui_Group_Gauge;
 extern lv_obj_t * ui_rgbRing;
 extern lv_obj_t * ui_imgGaugeSpeed;

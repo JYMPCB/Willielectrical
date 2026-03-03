@@ -6,6 +6,7 @@ ui.c
 components/ui_comp_hook.c
 ui_helpers.c
 images/ui_img_logoj2f_png.c
+images/ui_img_bg2_png.c
 images/ui_img_rgb_png.c
 images/ui_img_gauge_velocidad_png.c
 images/ui_img_speed_indicator_png.c

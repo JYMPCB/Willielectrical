@@ -1,12 +1,12 @@
-set(SOURCES screens/ui_INICIO.c
+SET(SOURCES screens/ui_INICIO.c
     screens/ui_HOME.c
     screens/ui_CONFIG.c
     screens/ui_PROGRAMADO.c
     ui.c
-    ui_events_stub.c
     components/ui_comp_hook.c
     ui_helpers.c
     images/ui_img_logoj2f_png.c
+    images/ui_img_bg2_png.c
     images/ui_img_rgb_png.c
     images/ui_img_gauge_velocidad_png.c
     images/ui_img_speed_indicator_png.c
@@ -36,5 +36,6 @@ set(SOURCES screens/ui_INICIO.c
 idf_component_register(
     SRCS ${SOURCES}
     INCLUDE_DIRS "."
-    REQUIRES lvgl audio
+    REQUIRES lvgl__lvgl events
+    WHOLE_ARCHIVE
 )

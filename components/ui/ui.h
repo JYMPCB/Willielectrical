@@ -35,6 +35,7 @@ extern lv_obj_t * ui____initial_actions0;
 
 // IMAGES AND IMAGE SETS
 LV_IMG_DECLARE(ui_img_logoj2f_png);    // assets/logoJ2F.png
+LV_IMG_DECLARE(ui_img_bg2_png);    // assets/bg2.png
 LV_IMG_DECLARE(ui_img_rgb_png);    // assets/RGB.png
 LV_IMG_DECLARE(ui_img_gauge_velocidad_png);    // assets/gauge_velocidad.png
 LV_IMG_DECLARE(ui_img_speed_indicator_png);    // assets/speed_indicator.png
