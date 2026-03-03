@@ -1,0 +1,12 @@
+idf_component_register(
+  SRCS
+    "src/audio_mgr.cpp"
+    "src/es8311.cpp"
+  INCLUDE_DIRS
+    "include"
+  REQUIRES
+    willi_common
+    driver
+    esp_driver_i2c
+    esp_driver_i2s
+)

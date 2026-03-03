@@ -1,0 +1,11 @@
+idf_component_register(
+  SRCS
+    "src/esp_lcd_jd9165.c"
+    "src/jd9165_lcd.cpp"
+  INCLUDE_DIRS
+    "include"
+  REQUIRES
+    willi_common
+    esp_lcd
+    driver
+)

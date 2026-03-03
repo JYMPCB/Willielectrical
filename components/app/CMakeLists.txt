@@ -1,0 +1,18 @@
+idf_component_register(
+  SRCS
+    "src/app_globals.cpp"
+    "src/app.cpp"
+  INCLUDE_DIRS
+    "include"
+  REQUIRES
+    willi_common
+    display_port
+    audio
+    tasks
+    wifi_mgr
+    training
+    service
+    ui_glue
+    driver
+    esp_driver_i2c
+)

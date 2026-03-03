@@ -1,0 +1,20 @@
+#pragma once
+
+
+// URL del manifest en GitHub Pages
+#ifndef OTA_MANIFEST_URL
+#define OTA_MANIFEST_URL "https://jympcb.github.io/Willielectrical/ota/latest.json"
+#endif
+
+// Llamalo al conectar WiFi y/o cada X minutos
+void ota_check_async();
+
+// OTA local via webserver (subida de .bin desde navegador)
+void ota_local_start();
+void ota_local_stop();
+
+// Lo llamás cuando el usuario toca "Actualizar"
+void ota_start_async();
+
+// Opcional: para que UI pueda “cancelar” antes de flashear (simple)
+void ota_request_cancel();

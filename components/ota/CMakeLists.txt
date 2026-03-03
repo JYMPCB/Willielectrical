@@ -1,0 +1,16 @@
+idf_component_register(
+  SRCS
+    "src/ota_mgr.cpp"
+  INCLUDE_DIRS
+    "include"
+  REQUIRES
+    willi_common
+    app
+    esp_https_ota
+    app_update
+    esp_http_client
+    esp_http_server
+    esp_wifi
+    mbedtls
+    json
+)

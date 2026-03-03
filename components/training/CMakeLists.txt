@@ -1,0 +1,9 @@
+idf_component_register(
+  SRCS
+    "src/training_interval.cpp"
+  INCLUDE_DIRS
+    "include"
+  REQUIRES
+    willi_common
+    app
+)

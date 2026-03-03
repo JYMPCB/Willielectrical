@@ -1,0 +1,13 @@
+idf_component_register(
+  SRCS
+    "src/esp_lcd_touch.c"
+    "src/esp_lcd_touch_gt911.c"
+    "src/gt911_touch.cpp"
+  INCLUDE_DIRS
+    "include"
+  REQUIRES
+    willi_common
+    esp_lcd
+    driver
+    esp_driver_i2c
+)

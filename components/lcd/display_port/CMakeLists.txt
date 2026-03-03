@@ -1,0 +1,12 @@
+idf_component_register(
+  SRCS
+    "src/display_port.cpp"
+  INCLUDE_DIRS
+    "include"
+  REQUIRES
+    willi_common
+    ui
+    MIPI
+    touch
+    lvgl
+)

@@ -1,0 +1,9 @@
+idf_component_register(
+  SRCS
+    "src/service_mgr.cpp"
+  INCLUDE_DIRS
+    "include"
+  REQUIRES
+    willi_common
+    nvs_flash
+)

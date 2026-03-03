@@ -1,0 +1,14 @@
+idf_component_register(
+  SRCS
+    "src/tasks.cpp"
+  INCLUDE_DIRS
+    "include"
+  PRIV_INCLUDE_DIRS
+    "../rgb/include"
+    "../training/include"
+  REQUIRES
+    willi_common
+    app
+    display_port
+    ui_glue
+)

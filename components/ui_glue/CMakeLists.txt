@@ -1,0 +1,14 @@
+idf_component_register(
+  SRCS
+    "src/ui_refresh.cpp"
+  INCLUDE_DIRS
+    "include"
+  REQUIRES
+    willi_common
+    lvgl__lvgl
+    app
+    ui
+    training
+    events
+    ota
+)
