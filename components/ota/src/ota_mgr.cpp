@@ -449,10 +449,15 @@ static void ota_start_task(void* pv) {
     }
 
     if (http_status != 200) {
-      ESP_LOGE(TAG, "OTA HTTP status not OK: %d", http_status);
+      ESP_LOGE(TAG, "OTA HTTP status not OK: %d, url=%s", http_status, g_ota_bin_url);
       esp_http_client_close(client);
       esp_http_client_cleanup(client);
-      set_status("HTTP bin error");
+      if (http_status == 404) {
+        g_ota_available = false;
+        set_status("Bin no encontrado (404)");
+      } else {
+        set_status("HTTP bin error");
+      }
       g_ota_active = false;
       vTaskDelete(NULL);
       return;
