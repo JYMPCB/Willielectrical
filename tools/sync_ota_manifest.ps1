@@ -3,13 +3,17 @@ param(
     [string]$RepoOwner = "jympcb",
     [string]$RepoName = "Willielectrical",
     [string]$AssetName = "will.bin",
-    [string]$Notes = "Auto-generated OTA manifest"
+    [string]$Notes = "Auto-generated OTA manifest",
+    [ValidateSet("pages", "release")]
+    [string]$Delivery = "pages"
 )
 
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
 $appGlobals = Join-Path $root "components/app/src/app_globals.cpp"
+$builtBin = Join-Path $root "build/Will.bin"
+$pagesBin = Join-Path $root "ota/will.bin"
 $manifestPaths = @(
     (Join-Path $root "ota/latest.json"),
     (Join-Path $root "docs/ota/latest.json")
@@ -28,7 +32,19 @@ if (-not $Version -or $Version.Trim().Length -eq 0) {
     $Version = $match.Groups[1].Value
 }
 
-$binUrl = "https://github.com/$RepoOwner/$RepoName/releases/download/v$Version/$AssetName"
+if ($Delivery -eq "release") {
+    $binUrl = "https://github.com/$RepoOwner/$RepoName/releases/download/v$Version/$AssetName"
+}
+else {
+    if (Test-Path $builtBin) {
+        Copy-Item -Path $builtBin -Destination $pagesBin -Force
+        Write-Host "Copiado bin OTA: $pagesBin"
+    } else {
+        Write-Warning "No se encontró $builtBin. Se mantiene/espera ota/will.bin existente."
+    }
+
+    $binUrl = "https://$RepoOwner.github.io/$RepoName/ota/$AssetName"
+}
 
 $manifestObj = [ordered]@{
     version = $Version

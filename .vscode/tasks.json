@@ -10,7 +10,9 @@
         "-ExecutionPolicy",
         "Bypass",
         "-File",
-        "tools/sync_ota_manifest.ps1"
+        "tools/sync_ota_manifest.ps1",
+        "-Delivery",
+        "pages"
       ],
       "group": "build",
       "problemMatcher": []
