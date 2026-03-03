@@ -1,5 +1,5 @@
 ﻿{
-    "version":  "0.1.3",
+    "version":  "0.1.4",
     "bin_url":  "https://jympcb.github.io/Willielectrical/ota/will.bin",
-    "notes":  "OTA via Pages"
+    "notes":  "Auto-generated OTA manifest"
 }
