@@ -11,26 +11,13 @@
 
 static const char *TAG = "ui_refresh";
 
-static void ota_check_click_cb(lv_event_t *e)
-{
-  if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
-  ESP_LOGI(TAG, "OTA check clicked");
-  ota_check_async();
-}
-
-static void ota_update_click_cb(lv_event_t *e)
-{
-  if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
-  ESP_LOGI(TAG, "OTA update clicked");
-  ota_start_async();
-}
-
 static bool first_refresh = true;
 
 // Flag RAM para no abrir el popup 20 veces en el refresh
 static bool s_service_evaluated_this_boot = false;  // evaluar vencimiento (1 vez)
 static bool s_service_popup_attempted_this_boot = false; // mostrar popup (1 vez)
 static bool s_ota_callbacks_bound = false;
+static bool s_ota_checked_this_boot = false;
 
 static void service_popup_show() {
   // Mostrar panel (popup)
@@ -298,12 +285,12 @@ extern "C" void ui_refresh_cb(lv_timer_t *t)
     last_ota_prog = disp_prog;
   }
 
-  // 3) Status (solo si cambia)
-  if (g_ota_active && ui_lblOtaStatus) {
+  // 3) Status (solo si cambia) -> en lblOtaNotes
+  if (g_ota_active && ui_lblOtaNotes) {
     // g_ota_status debería ser null-terminated
     if (strncmp(last_ota_status, g_ota_status, sizeof(last_ota_status)) != 0) {
       strlcpy(last_ota_status, g_ota_status, sizeof(last_ota_status));
-      lv_label_set_text(ui_lblOtaStatus, last_ota_status);
+      lv_label_set_text(ui_lblOtaNotes, last_ota_status);
     }
   }
 
@@ -342,8 +329,7 @@ extern "C" void ui_refresh_cb(lv_timer_t *t)
 
     if (!s_ota_callbacks_bound) {
       ota_local_start();
-      if (ui_btnOtaCheck)  lv_obj_add_event_cb(ui_btnOtaCheck, ota_check_click_cb, LV_EVENT_CLICKED, NULL);
-      if (ui_btnOtaUpdate) lv_obj_add_event_cb(ui_btnOtaUpdate, ota_update_click_cb, LV_EVENT_CLICKED, NULL);
+      if (ui_btnOtaCheck) lv_obj_add_flag(ui_btnOtaCheck, LV_OBJ_FLAG_HIDDEN);
       s_ota_callbacks_bound = true;
     }
 
@@ -351,43 +337,55 @@ extern "C" void ui_refresh_cb(lv_timer_t *t)
   }
   
 
-  // HOME: indicador de update
+  // HOME: dotOta visible solo cuando hay update
   if (ui_dotOta) {
-      if (g_ota_available)
-          lv_obj_clear_flag(ui_dotOta, LV_OBJ_FLAG_HIDDEN);
-      else
-          lv_obj_add_flag(ui_dotOta, LV_OBJ_FLAG_HIDDEN);
+    if (g_ota_available) lv_obj_clear_flag(ui_dotOta, LV_OBJ_FLAG_HIDDEN);
+    else                 lv_obj_add_flag(ui_dotOta, LV_OBJ_FLAG_HIDDEN);
   }
 
-  // CONFIG: estado textual
-  if (ui_lblOtaStatus) {
-      lv_label_set_text(ui_lblOtaStatus, g_ota_status);
+  // OTA auto-check al boot para que dotOta aparezca en HOME sin entrar a CONFIG
+  if (!s_ota_checked_this_boot && home_active && wifi_ok && !g_ota_check_running) {
+    ESP_LOGI(TAG, "Boot HOME -> OTA auto-check");
+    s_ota_checked_this_boot = true;
+    ota_check_async();
   }
 
-  // CONFIG: notas
+  // CONFIG: todo el texto OTA en lblOtaNotes
   if (ui_lblOtaNotes) {
-      if (g_ota_available)
-          lv_label_set_text(ui_lblOtaNotes, g_ota_notes);
-      else
-          lv_label_set_text(ui_lblOtaNotes, "");
+    char ota_text[256];
+    if (g_ota_active) {
+      strlcpy(ota_text, g_ota_status, sizeof(ota_text));
+    } else if (g_ota_available) {
+      if (g_ota_notes[0] != '\0') {
+        strlcpy(ota_text, g_ota_status, sizeof(ota_text));
+        strlcat(ota_text, "\n", sizeof(ota_text));
+        strlcat(ota_text, g_ota_notes, sizeof(ota_text));
+      } else {
+        strlcpy(ota_text, g_ota_status, sizeof(ota_text));
+      }
+    } else {
+      strlcpy(ota_text, (g_ota_status[0] != '\0') ? g_ota_status : "Al dia", sizeof(ota_text));
+    }
+    lv_label_set_text(ui_lblOtaNotes, ota_text);
   }
+
+  // Si existe label legado, lo dejamos vacío para no duplicar mensajes
+  if (ui_lblOtaStatus) lv_label_set_text(ui_lblOtaStatus, "");
 
   // CONFIG: progreso
   if (ui_barOta) {
-      if (g_ota_active) {
-          lv_obj_clear_flag(ui_barOta, LV_OBJ_FLAG_HIDDEN);
-          lv_bar_set_value(ui_barOta, g_ota_progress, LV_ANIM_OFF);
-      } else {
-          lv_bar_set_value(ui_barOta, 0, LV_ANIM_OFF);
-      }
+    if (g_ota_active) {
+      lv_obj_clear_flag(ui_barOta, LV_OBJ_FLAG_HIDDEN);
+      lv_bar_set_value(ui_barOta, g_ota_progress, LV_ANIM_OFF);
+    } else {
+      lv_bar_set_value(ui_barOta, 0, LV_ANIM_OFF);
+    }
   }
 
-  // CONFIG: botón actualizar
+  // CONFIG: botón actualizar (btnOtaUpdate)
   if (ui_btnOtaUpdate) {
-      if (g_ota_available && !g_ota_active)
-          lv_obj_clear_state(ui_btnOtaUpdate, LV_STATE_DISABLED);
-      else
-          lv_obj_add_state(ui_btnOtaUpdate, LV_STATE_DISABLED);
+    if (g_ota_available && !g_ota_active) lv_obj_clear_state(ui_btnOtaUpdate, LV_STATE_DISABLED);
+    else                                  lv_obj_add_state(ui_btnOtaUpdate, LV_STATE_DISABLED);
   }
 
   // ============================================================
@@ -416,39 +414,6 @@ extern "C" void ui_refresh_cb(lv_timer_t *t)
     g_service.onPostpone();
     service_popup_hide(); // LVGL acá OK
   }
-
-    // HOME: puntito si hay update
-  if (ui_dotOta) {
-    lv_obj_add_flag(ui_dotOta, g_ota_available ? LV_OBJ_FLAG_HIDDEN : 0); // si usás flags al revés ajustalo
-    if (g_ota_available) lv_obj_clear_flag(ui_dotOta, LV_OBJ_FLAG_HIDDEN);
-    else lv_obj_add_flag(ui_dotOta, LV_OBJ_FLAG_HIDDEN);
-  }
-
-  // Config: status + notas + progreso
-  if (ui_lblOtaStatus) lv_label_set_text(ui_lblOtaStatus, g_ota_status);
-
-  if (ui_lblOtaNotes) {
-    if (g_ota_available) lv_label_set_text(ui_lblOtaNotes, g_ota_notes);
-    else lv_label_set_text(ui_lblOtaNotes, "");
-  }
-
-  if (ui_barOta) {
-    if (g_ota_active) {
-      lv_obj_clear_flag(ui_barOta, LV_OBJ_FLAG_HIDDEN);
-      lv_bar_set_value(ui_barOta, g_ota_progress, LV_ANIM_OFF);
-    } else {
-      // opcional: ocultar o dejar en 0
-      // lv_obj_add_flag(ui_barOta, LV_OBJ_FLAG_HIDDEN);
-      lv_bar_set_value(ui_barOta, 0, LV_ANIM_OFF);
-    }
-  }
-
-  // Botón update habilitado solo si hay update y no está en progreso
-  if (ui_btnOtaUpdate) {
-    if (g_ota_available && !g_ota_active) lv_obj_clear_state(ui_btnOtaUpdate, LV_STATE_DISABLED);
-    else lv_obj_add_state(ui_btnOtaUpdate, LV_STATE_DISABLED);
-  }
-
 
   // --- WIFI: scan al entrar ---
   if(req & UI_REQ_WIFI_SCAN) {

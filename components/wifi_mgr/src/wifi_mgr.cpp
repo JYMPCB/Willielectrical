@@ -219,6 +219,7 @@ esp_err_t wifi_mgr_init(void)
 
   wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
   ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+  ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_FLASH));
 
   ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
   ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL));
@@ -226,11 +227,35 @@ esp_err_t wifi_mgr_init(void)
   ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
   ESP_ERROR_CHECK(esp_wifi_start());
 
+  wifi_config_t saved_wc = {0};
+  bool has_saved_sta = false;
+  if (esp_wifi_get_config(WIFI_IF_STA, &saved_wc) == ESP_OK && saved_wc.sta.ssid[0] != '\0') {
+    has_saved_sta = true;
+    strlcpy(pending_ssid, (const char*)saved_wc.sta.ssid, sizeof(pending_ssid));
+    strlcpy(pending_pass, (const char*)saved_wc.sta.password, sizeof(pending_pass));
+  }
+
   // MAC + FW en globals (como tu enter_config)
   refresh_cfg_mac_fw();
 
   set_globals_disconnected();
-  cfg_wifi_state = CFG_WIFI_IDLE;
+
+  if (has_saved_sta) {
+    s_allow_reconnect = true;
+    s_connect_t0 = now_ms();
+    cfg_wifi_state = CFG_WIFI_CONNECTING;
+    snprintf(cfg_info, sizeof(cfg_info), "Reconectando a %s...", pending_ssid);
+
+    esp_err_t err_connect = esp_wifi_connect();
+    if (err_connect != ESP_OK) {
+      ESP_LOGW(TAG, "auto esp_wifi_connect failed: %s", esp_err_to_name(err_connect));
+      cfg_wifi_state = CFG_WIFI_IDLE;
+    }
+  } else {
+    s_allow_reconnect = false;
+    cfg_wifi_state = CFG_WIFI_IDLE;
+    snprintf(cfg_info, sizeof(cfg_info), "Desconectado");
+  }
 
   s_inited = true;
   ESP_LOGI(TAG, "init OK");

@@ -61,6 +61,15 @@ static esp_err_t http_collect_cb(esp_http_client_event_t *evt)
   return ESP_OK;
 }
 
+static void ota_apply_auth_headers(esp_http_client_handle_t client)
+{
+  if (!client) return;
+
+  if (OTA_AUTH_HEADER_NAME[0] != '\0' && OTA_AUTH_HEADER_VALUE[0] != '\0') {
+    esp_http_client_set_header(client, OTA_AUTH_HEADER_NAME, OTA_AUTH_HEADER_VALUE);
+  }
+}
+
 static bool ota_network_ready(void)
 {
   wifi_ap_record_t ap = {};
@@ -290,6 +299,8 @@ static void ota_check_task(void* pv) {
     return;
   }
 
+  ota_apply_auth_headers(client);
+
   esp_err_t err = esp_http_client_perform(client);
   int code = esp_http_client_get_status_code(client);
   esp_http_client_cleanup(client);
@@ -394,6 +405,8 @@ static void ota_start_task(void* pv) {
     vTaskDelete(NULL);
     return;
   }
+
+  ota_apply_auth_headers(client);
 
   esp_err_t err = esp_http_client_open(client, 0);
   if (err != ESP_OK) {
