@@ -35,8 +35,10 @@ static void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t
   const int offsety1 = area->y1;
   const int offsety2 = area->y2;
 
-  //lcd.lcd_draw_bitmap(offsetx1, offsety1, offsetx2 + 1, offsety2 + 1, &color_p->full);
-  lcd.lcd_draw_bitmap(offsetx1, offsety1, offsetx2 + 1, offsety2 + 1, (uint16_t*)color_p);
+  esp_err_t err = lcd.lcd_draw_bitmap(offsetx1, offsety1, offsetx2 + 1, offsety2 + 1, (uint16_t*)color_p);
+  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+    ESP_LOGW(TAG, "lcd_draw_bitmap failed: %s", esp_err_to_name(err));
+  }
 
   lv_disp_flush_ready(disp);
 }

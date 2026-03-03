@@ -5,7 +5,7 @@
 
 // --- Firmware version ---
 #ifndef FW_VERSION
-#define FW_VERSION "0.1.3"
+#define FW_VERSION "0.1.4"
 #endif
 
 const char* g_fw_version = FW_VERSION;

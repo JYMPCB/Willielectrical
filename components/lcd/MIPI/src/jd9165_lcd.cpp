@@ -156,9 +156,24 @@ void jd9165_lcd::begin()
   ESP_LOGI(TAG, "[jd9165] begin() OK");
 }
 
-void jd9165_lcd::lcd_draw_bitmap(uint16_t x_start, uint16_t y_start, uint16_t x_end, uint16_t y_end, uint16_t *color_data)
+esp_err_t jd9165_lcd::lcd_draw_bitmap(uint16_t x_start, uint16_t y_start, uint16_t x_end, uint16_t y_end, uint16_t *color_data)
 {
-    esp_lcd_panel_draw_bitmap(panel_handle, x_start, y_start, x_end, y_end, color_data);
+  esp_err_t err = ESP_FAIL;
+
+  for (int tries = 0; tries < 40; ++tries) {
+    err = esp_lcd_panel_draw_bitmap(panel_handle, x_start, y_start, x_end, y_end, color_data);
+    if (err == ESP_OK) {
+      return ESP_OK;
+    }
+
+    if (err != ESP_ERR_INVALID_STATE) {
+      break;
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(1));
+  }
+
+  return err;
 }
 
 void jd9165_lcd::draw16bitbergbbitmap(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *color_data)
@@ -168,7 +183,7 @@ void jd9165_lcd::draw16bitbergbbitmap(uint16_t x, uint16_t y, uint16_t w, uint16
     uint16_t x_end = w + x;
     uint16_t y_end = h + y;
 
-    esp_lcd_panel_draw_bitmap(panel_handle, x_start, y_start, x_end, y_end, color_data);
+    (void)lcd_draw_bitmap(x_start, y_start, x_end, y_end, color_data);
 }
 
 void jd9165_lcd::fillScreen(uint16_t color)
