@@ -354,10 +354,19 @@ void guiTask(void *pv)
 
     // Devuelve ms hasta el próximo timer que LVGL necesita atender
     uint32_t wait_ms = display_port_lvgl_handler();
-    
-    // Clamp para que nunca se vaya al pasto (evita backlog gigante)
-    if(wait_ms > 10) wait_ms = 10;   // 10ms (~100 Hz max)
-    if(wait_ms < 1)  wait_ms = 1;
+
+    // Reducir frecuencia de refresh en escenarios de alta carga de bus (WiFi scan/OTA/config)
+    // para evitar solapamiento en MIPI-DPI: "previous draw operation is not finished".
+    bool high_bus_load_ui = habConfig || g_ota_check_running || g_ota_active;
+
+    if (high_bus_load_ui) {
+      if (wait_ms < 30) wait_ms = 30;  // ~33 Hz mientras hay carga alta
+      if (wait_ms > 50) wait_ms = 50;
+    } else {
+      // Clamp normal
+      if(wait_ms > 16) wait_ms = 16;   // ~60 Hz max en operación normal
+      if(wait_ms < 2)  wait_ms = 2;
+    }
 
     vTaskDelay(pdMS_TO_TICKS(wait_ms));
   }
