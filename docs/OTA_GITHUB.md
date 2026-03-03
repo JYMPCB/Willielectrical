@@ -42,12 +42,12 @@ Regla clave: solo actualiza si `version` del manifest es mayor que `g_fw_version
 ## 3) Flujo recomendado por versión
 
 1. Subir `FW_VERSION` en código (ej. `0.1.1`).
-2. `build` para generar `build/Will.bin`.
-3. Renombrar/copiar a `will.bin` para release.
-4. Publicar release `v0.1.1` con `will.bin`.
-5. Actualizar `ota/latest.json` con:
-   - `version: "0.1.1"`
-   - `bin_url` apuntando a release `v0.1.1`
+2. Ejecutar tarea VS Code: **`OTA: Sync latest.json`**.
+  - Actualiza automáticamente `ota/latest.json` y `docs/ota/latest.json` usando `FW_VERSION`.
+  - Genera `bin_url` como `https://github.com/jympcb/Willielectrical/releases/download/vX.Y.Z/will.bin`.
+3. `build` para generar `build/Will.bin`.
+4. Renombrar/copiar a `will.bin` para release.
+5. Publicar release `v0.1.1` con `will.bin`.
 6. `git push` del manifest.
 7. En el equipo con firmware anterior, botón **Check update** y luego **Actualizar**.
 

@@ -23,3 +23,16 @@ set(COMPONENTS
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(Will I electrical)
+
+if(WIN32)
+	add_custom_target(sync_ota_manifest
+		COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File ${CMAKE_SOURCE_DIR}/tools/sync_ota_manifest.ps1
+		WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+		COMMENT "Sync OTA latest.json from FW_VERSION"
+		VERBATIM
+	)
+
+	if(TARGET app)
+		add_dependencies(app sync_ota_manifest)
+	endif()
+endif()
