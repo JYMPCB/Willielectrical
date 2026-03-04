@@ -34,6 +34,7 @@ sdkconfig
 
 # OTA bin público en Pages
 !ota/will.bin
+!ota/will-*.bin
 
 # ESP-IDF dependencies
 # For older versions or manual component management

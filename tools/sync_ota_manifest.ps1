@@ -13,7 +13,7 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $appGlobals = Join-Path $root "components/app/src/app_globals.cpp"
 $builtBin = Join-Path $root "build/Will.bin"
-$pagesBin = Join-Path $root "ota/will.bin"
+$pagesBinStable = Join-Path $root "ota/will.bin"
 $manifestPaths = @(
     (Join-Path $root "ota/latest.json"),
     (Join-Path $root "docs/ota/latest.json")
@@ -36,14 +36,19 @@ if ($Delivery -eq "release") {
     $binUrl = "https://github.com/$RepoOwner/$RepoName/releases/download/v$Version/$AssetName"
 }
 else {
+    $pagesAssetName = if ($AssetName -and $AssetName.Trim().Length -gt 0 -and $AssetName -ne "will.bin") { $AssetName } else { "will-$Version.bin" }
+    $pagesBinVersioned = Join-Path $root ("ota/" + $pagesAssetName)
+
     if (Test-Path $builtBin) {
-        Copy-Item -Path $builtBin -Destination $pagesBin -Force
-        Write-Host "Copiado bin OTA: $pagesBin"
+        Copy-Item -Path $builtBin -Destination $pagesBinVersioned -Force
+        Copy-Item -Path $builtBin -Destination $pagesBinStable -Force
+        Write-Host "Copiado bin OTA versionado: $pagesBinVersioned"
+        Write-Host "Copiado bin OTA estable: $pagesBinStable"
     } else {
         Write-Warning "No se encontró $builtBin. Se mantiene/espera ota/will.bin existente."
     }
 
-    $binUrl = "https://$RepoOwner.github.io/$RepoName/ota/$AssetName"
+    $binUrl = "https://$RepoOwner.github.io/$RepoName/ota/$pagesAssetName"
 }
 
 $manifestObj = [ordered]@{

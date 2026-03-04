@@ -98,6 +98,28 @@ static void ota_schedule_reboot_ms(uint32_t delay_ms)
   esp_timer_start_once(s_reboot_timer, (uint64_t)delay_ms * 1000ULL);
 }
 
+static void ota_quiesce_network(void)
+{
+  esp_err_t err = esp_wifi_scan_stop();
+  if (err != ESP_OK && err != ESP_ERR_WIFI_STATE) {
+    ESP_LOGW(TAG, "esp_wifi_scan_stop: %s", esp_err_to_name(err));
+  }
+
+  err = esp_wifi_disconnect();
+  if (err != ESP_OK && err != ESP_ERR_WIFI_NOT_STARTED && err != ESP_ERR_WIFI_NOT_INIT) {
+    ESP_LOGW(TAG, "esp_wifi_disconnect: %s", esp_err_to_name(err));
+  }
+
+  vTaskDelay(pdMS_TO_TICKS(80));
+
+  err = esp_wifi_stop();
+  if (err != ESP_OK && err != ESP_ERR_WIFI_NOT_STARTED && err != ESP_ERR_WIFI_NOT_INIT) {
+    ESP_LOGW(TAG, "esp_wifi_stop: %s", esp_err_to_name(err));
+  }
+
+  vTaskDelay(pdMS_TO_TICKS(60));
+}
+
 static esp_err_t local_root_get_handler(httpd_req_t *req)
 {
   httpd_resp_set_type(req, "text/html; charset=utf-8");
@@ -195,6 +217,8 @@ static esp_err_t local_ota_post_handler(httpd_req_t *req)
 
   httpd_resp_set_type(req, "application/json; charset=utf-8");
   httpd_resp_sendstr(req, "{\"ok\":true,\"msg\":\"Actualizado con exito\"}");
+
+  ota_quiesce_network();
 
   ota_schedule_reboot_ms(800);
   return ESP_OK;
@@ -564,6 +588,23 @@ static void ota_start_task(void* pv) {
   if (!failed) {
     err = esp_ota_end(ota_handle);
     if (err == ESP_OK) {
+      esp_app_desc_t new_app_info = {};
+      esp_err_t desc_err = esp_ota_get_partition_description(update_partition, &new_app_info);
+      if (desc_err == ESP_OK) {
+        const char *new_ver = new_app_info.version;
+        const char *cur_ver = g_fw_version ? g_fw_version : "0.0.0";
+        ESP_LOGI(TAG, "OTA image version=%s current=%s", new_ver, cur_ver);
+        if (semver_cmp(new_ver, cur_ver) <= 0) {
+          ESP_LOGW(TAG, "OTA image version does not advance (new=%s current=%s)", new_ver, cur_ver);
+          set_status("Bin version no avanza");
+          failed = true;
+          fail_status = "Bin version no avanza";
+        }
+      } else {
+        ESP_LOGW(TAG, "esp_ota_get_partition_description failed: %s", esp_err_to_name(desc_err));
+      }
+    }
+    if (err == ESP_OK && !failed) {
       err = esp_ota_set_boot_partition(update_partition);
     }
     if (err != ESP_OK) {
@@ -585,6 +626,8 @@ static void ota_start_task(void* pv) {
 
   g_ota_progress = 100;
   set_status("OK, reiniciando");
+
+  ota_quiesce_network();
 
   vTaskDelay(pdMS_TO_TICKS(600));
   esp_restart();
