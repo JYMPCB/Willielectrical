@@ -5,12 +5,12 @@
 
 // --- Firmware version ---
 #ifndef FW_VERSION
-#define FW_VERSION "0.1.7"
+#define FW_VERSION "0.1.8"
 #endif
 
 const char* g_fw_version = FW_VERSION;
 #ifndef FW_BUILD
-#define FW_BUILD 20260303
+#define FW_BUILD 20260304
 #endif
 const uint32_t g_fw_build = (uint32_t)FW_BUILD;
 

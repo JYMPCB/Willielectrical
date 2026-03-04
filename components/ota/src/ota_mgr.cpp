@@ -277,6 +277,15 @@ static int semver_cmp(const char* a, const char* b) {
   return 0;
 }
 
+static bool semver_valid(const char *s)
+{
+  if (!s || s[0] == '\0') return false;
+  int major = 0, minor = 0, patch = 0;
+  char tail = '\0';
+  int n = sscanf(s, "%d.%d.%d%c", &major, &minor, &patch, &tail);
+  return n == 3;
+}
+
 static void set_status(const char* s) {
   if(!s) s = "";
   strlcpy(g_ota_status, s, sizeof(g_ota_status));
@@ -594,11 +603,15 @@ static void ota_start_task(void* pv) {
         const char *new_ver = new_app_info.version;
         const char *cur_ver = g_fw_version ? g_fw_version : "0.0.0";
         ESP_LOGI(TAG, "OTA image version=%s current=%s", new_ver, cur_ver);
-        if (semver_cmp(new_ver, cur_ver) <= 0) {
-          ESP_LOGW(TAG, "OTA image version does not advance (new=%s current=%s)", new_ver, cur_ver);
-          set_status("Bin version no avanza");
-          failed = true;
-          fail_status = "Bin version no avanza";
+        if (semver_valid(new_ver) && semver_valid(cur_ver)) {
+          if (semver_cmp(new_ver, cur_ver) <= 0) {
+            ESP_LOGW(TAG, "OTA image version does not advance (new=%s current=%s)", new_ver, cur_ver);
+            set_status("Bin version no avanza");
+            failed = true;
+            fail_status = "Bin version no avanza";
+          }
+        } else {
+          ESP_LOGW(TAG, "OTA image version is non-semver (%s). Skipping strict version-advance check.", new_ver);
         }
       } else {
         ESP_LOGW(TAG, "esp_ota_get_partition_description failed: %s", esp_err_to_name(desc_err));
