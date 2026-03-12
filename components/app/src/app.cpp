@@ -33,6 +33,7 @@ extern "C" {
 #if EN_WIFI
 #include "wifi_mgr.h"
 #endif
+
 #if EN_SERVICES
 #include "service_mgr.h"
 #endif
@@ -105,6 +106,8 @@ void app_init()
   ESP_ERROR_CHECK(wifi_mgr_init());
   wifi_mgr_start_task();
   #endif
+
+  
 
   #if EN_TI
   ti_init();

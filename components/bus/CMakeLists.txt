@@ -1,0 +1,10 @@
+idf_component_register(
+    SRCS
+        "src/bus_crc.c"
+        "src/bus_proto.c"
+        "src/bus_master.c"
+    INCLUDE_DIRS
+        "include"
+    REQUIRES
+        driver
+)

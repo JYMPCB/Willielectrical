@@ -32,3 +32,10 @@
 
 // Extra hardware
 #define WS2812_PIN 26
+
+// RS485 
+#define PIN_RS485_TX       37
+#define PIN_RS485_RX       38
+
+#define HMI_UART_NUM       UART_NUM_1
+#define HMI_UART_BAUD      115200

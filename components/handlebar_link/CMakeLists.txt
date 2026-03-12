@@ -1,0 +1,10 @@
+idf_component_register(
+    SRCS
+        "src/handlebar_link.c"
+    INCLUDE_DIRS
+        "include"
+    PRIV_INCLUDE_DIRS
+        "${PROJECT_DIR}/include"
+    REQUIRES
+        bus
+)
