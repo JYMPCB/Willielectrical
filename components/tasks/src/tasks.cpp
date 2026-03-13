@@ -340,6 +340,10 @@ void speedTask(void *pv)
   }
 }
 
+volatile uint32_t g_gui_worstGap_ms = 0;
+volatile uint32_t g_gui_last_lv_us  = 0;
+volatile uint32_t g_gui_stack_hw    = 0;
+
 void guiTask(void *pv)
 {
   uint32_t last_tick_ms = now_ms();
@@ -349,6 +353,8 @@ void guiTask(void *pv)
     uint32_t elapsed_ms = now_tick_ms - last_tick_ms;
     last_tick_ms = now_tick_ms;
     if (elapsed_ms == 0) elapsed_ms = 1;
+
+    g_gui_stack_hw = (uint32_t)uxTaskGetStackHighWaterMark(NULL);
 
     lv_tick_inc(elapsed_ms);
 
@@ -371,10 +377,6 @@ void guiTask(void *pv)
     vTaskDelay(pdMS_TO_TICKS(wait_ms));
   }
 }
-
-volatile uint32_t g_gui_worstGap_ms = 0;
-volatile uint32_t g_gui_last_lv_us  = 0;
-volatile uint32_t g_gui_stack_hw    = 0;
 
 //TAREAS PARA PRUEBAS
 void logTask(void *){
@@ -412,7 +414,10 @@ void logTask(void *){
 
 void startTasks()
 {
-  xTaskCreatePinnedToCore(guiTask,   "gui",   8192, NULL, 4, NULL,            1);
+  BaseType_t rc = xTaskCreatePinnedToCore(guiTask, "gui", 12288, NULL, 4, NULL, 1);
+  if (rc != pdPASS) {
+    ESP_LOGE(TAG, "Failed to create gui task");
+  }
   //xTaskCreatePinnedToCore(mathTask,  "math",  4096, NULL, 3, &g_mathTaskHandle,  0);
   //xTaskCreatePinnedToCore(speedTask, "speed", 4096, NULL, 3, &g_speedTaskHandle, 0);
 }

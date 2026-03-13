@@ -16,8 +16,8 @@ extern "C" {
 #define EN_AUDIO   1
 #define EN_TASKS   1
 #define EN_WIFI    1
-#define EN_SERVICES 1
-#define EN_TI 1
+#define EN_SERVICES 0
+#define EN_TI 0
 
 #if EN_DISPLAY
 #include "display_port.h"
@@ -47,6 +47,14 @@ void app_init()
   esp_log_level_set("wifi", ESP_LOG_VERBOSE);
   esp_log_level_set("esp_netif", ESP_LOG_VERBOSE);
   // esp_log_level_set("tcpip_adapter", ESP_LOG_VERBOSE); // <- fuera
+
+  #if EN_TASKS
+  g_ui_mutex = xSemaphoreCreateMutex();
+  if (g_ui_mutex == nullptr) {
+    ESP_LOGE(TAG, "xSemaphoreCreateMutex FAILED -> halt");
+    while(1) vTaskDelay(pdMS_TO_TICKS(100));
+  }
+  #endif
 
   ESP_LOGI(TAG, "Board: %s", BOARD_NAME);
 
@@ -95,14 +103,11 @@ void app_init()
   #endif
 
   #if EN_TASKS
-  g_ui_mutex = xSemaphoreCreateMutex();
+  ui_refresh_start_timer();
   startTasks();
   #endif
 
-  ui_refresh_start_timer();
-
   #if EN_WIFI
-  ESP_ERROR_CHECK(wifi_mgr_init());
   wifi_mgr_start_task();
   #endif
 

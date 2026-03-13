@@ -12,6 +12,7 @@
 #include "nvs_flash.h"
 #include "esp_heap_caps.h"
 #include "esp_sntp.h"
+#include "esp_hosted.h"
 
 #include "lwip/inet.h"
 #include <stdlib.h>
@@ -21,6 +22,11 @@ static const char *TAG = "wifi_mgr";
 
 static TaskHandle_t s_task = NULL;
 static bool s_inited = false;
+static bool s_handlers_registered = false;
+static uint32_t s_init_retry_t0 = 0;
+static const uint32_t INIT_RETRY_MS = 3000;
+static uint32_t s_init_retry_backoff_ms = INIT_RETRY_MS;
+static const uint32_t INIT_RETRY_MAX_MS = 30000;
 
 // conexión no bloqueante
 static uint32_t s_connect_t0 = 0;
@@ -78,7 +84,7 @@ static void set_globals_disconnected(void)
 static void set_globals_connected_from_netif(void)
 {
   // SSID
-  wifi_ap_record_t ap = {0};
+  wifi_ap_record_t ap{};
   if (esp_wifi_sta_get_ap_info(&ap) == ESP_OK) {
     strlcpy(cfg_ssid, (const char*)ap.ssid, sizeof(cfg_ssid));
   }
@@ -202,32 +208,93 @@ esp_err_t wifi_mgr_init(void)
 {
   if (s_inited) return ESP_OK;
 
-  // NVS requerido por WiFi
   esp_err_t err = nvs_flash_init();
   if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-    ESP_ERROR_CHECK(nvs_flash_erase());
-    ESP_ERROR_CHECK(nvs_flash_init());
-  } else {
-    ESP_ERROR_CHECK(err);
+    esp_err_t e2 = nvs_flash_erase();
+    if (e2 != ESP_OK) {
+      ESP_LOGE(TAG, "nvs_flash_erase failed: %s", esp_err_to_name(e2));
+      return e2;
+    }
+    err = nvs_flash_init();
+  }
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "nvs_flash_init failed: %s", esp_err_to_name(err));
+    return err;
   }
 
-  ESP_ERROR_CHECK(esp_netif_init());
-  ESP_ERROR_CHECK(esp_event_loop_create_default());
+  err = esp_netif_init();
+  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+    ESP_LOGE(TAG, "esp_netif_init failed: %s", esp_err_to_name(err));
+    return err;
+  }
 
-  // STA default netif
-  esp_netif_create_default_wifi_sta();
+  err = esp_event_loop_create_default();
+  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+    ESP_LOGE(TAG, "esp_event_loop_create_default failed: %s", esp_err_to_name(err));
+    return err;
+  }
+
+  // Bring up ESP-Hosted transport explicitly before esp_wifi_init().
+  // The constructor auto-init was intentionally disabled to avoid boot loops
+  // when the co-processor is unavailable.
+  err = (esp_err_t)esp_hosted_init();
+  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+    ESP_LOGW(TAG, "esp_hosted_init failed: %s", esp_err_to_name(err));
+    return err;
+  }
+
+  // STA default netif: create only once, otherwise IDF can assert on duplicate key
+  esp_netif_t *sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+  if (!sta_netif) {
+    sta_netif = esp_netif_create_default_wifi_sta();
+    if (!sta_netif) {
+      ESP_LOGE(TAG, "esp_netif_create_default_wifi_sta failed");
+      return ESP_FAIL;
+    }
+  }
 
   wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-  ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-  ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_FLASH));
+  err = esp_wifi_init(&cfg);
+  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+    ESP_LOGW(TAG, "esp_wifi_init failed: %s", esp_err_to_name(err));
+    return err;
+  }
 
-  ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
-  ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL));
+  err = esp_wifi_set_storage(WIFI_STORAGE_FLASH);
+  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+    ESP_LOGW(TAG, "esp_wifi_set_storage failed: %s", esp_err_to_name(err));
+    return err;
+  }
 
-  ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-  ESP_ERROR_CHECK(esp_wifi_start());
+  if (!s_handlers_registered) {
+    err = esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL);
+    if (err != ESP_OK) {
+      ESP_LOGW(TAG, "event_handler_register WIFI failed: %s", esp_err_to_name(err));
+      return err;
+    }
 
-  wifi_config_t saved_wc = {0};
+    err = esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL);
+    if (err != ESP_OK) {
+      ESP_LOGW(TAG, "event_handler_register IP failed: %s", esp_err_to_name(err));
+      return err;
+    }
+
+    s_handlers_registered = true;
+  }
+
+  err = esp_wifi_set_mode(WIFI_MODE_STA);
+  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+    ESP_LOGW(TAG, "esp_wifi_set_mode failed: %s", esp_err_to_name(err));
+    return err;
+  }
+
+  err = esp_wifi_start();
+  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+    ESP_LOGW(TAG, "esp_wifi_start failed: %s", esp_err_to_name(err));
+    return err;
+  }
+
+  wifi_config_t saved_wc{};
   bool has_saved_sta = false;
   if (esp_wifi_get_config(WIFI_IF_STA, &saved_wc) == ESP_OK && saved_wc.sta.ssid[0] != '\0') {
     has_saved_sta = true;
@@ -266,7 +333,7 @@ void wifi_mgr_on_enter_config(void)
 {
   refresh_cfg_mac_fw();
 
-  wifi_config_t wc = {0};
+  wifi_config_t wc{};
   if (esp_wifi_get_config(WIFI_IF_STA, &wc) == ESP_OK) {
     if (wc.sta.ssid[0] != '\0') {
       strlcpy(pending_ssid, (const char*)wc.sta.ssid, sizeof(pending_ssid));
@@ -317,6 +384,34 @@ static void wifi_mgr_task(void *pv)
 {
   for (;;) {
 
+    if (!s_inited) {
+      uint32_t now = now_ms();
+      if (now - s_init_retry_t0 >= s_init_retry_backoff_ms) {
+        s_init_retry_t0 = now;
+        esp_err_t init_err = wifi_mgr_init();
+        if (init_err != ESP_OK) {
+          if (init_err == ESP_FAIL) {
+            uint32_t next_backoff = s_init_retry_backoff_ms * 2;
+            s_init_retry_backoff_ms = (next_backoff > INIT_RETRY_MAX_MS) ? INIT_RETRY_MAX_MS : next_backoff;
+          } else {
+            s_init_retry_backoff_ms = INIT_RETRY_MS;
+          }
+
+          ESP_LOGW(TAG, "wifi init retry in %lus (err=%s)",
+                   (unsigned long)(s_init_retry_backoff_ms / 1000),
+                   esp_err_to_name(init_err));
+          snprintf(cfg_info, sizeof(cfg_info), "WiFi init retry (%s)", esp_err_to_name(init_err));
+          vTaskDelay(pdMS_TO_TICKS(200));
+          continue;
+        }
+
+        s_init_retry_backoff_ms = INIT_RETRY_MS;
+      } else {
+        vTaskDelay(pdMS_TO_TICKS(100));
+        continue;
+      }
+    }
+
     // Entró a config (1 vez)
     if (cfg_entered) {
       cfg_entered = false;
@@ -360,13 +455,12 @@ static void wifi_mgr_task(void *pv)
       scan_n = 0;
       cfg_dd_opts[0] = '\0';
 
-      wifi_scan_config_t sc = {
-        .ssid = 0,
-        .bssid = 0,
-        .channel = 0,
-        .show_hidden = true,
-        .scan_type = WIFI_SCAN_TYPE_ACTIVE
-      };
+      wifi_scan_config_t sc{};
+      sc.ssid = 0;
+      sc.bssid = 0;
+      sc.channel = 0;
+      sc.show_hidden = true;
+      sc.scan_type = WIFI_SCAN_TYPE_ACTIVE;
 
       s_scan_running = true;
       esp_err_t err = esp_wifi_scan_start(&sc, false); // async
@@ -390,13 +484,20 @@ static void wifi_mgr_task(void *pv)
       } else {
         snprintf(cfg_info, sizeof(cfg_info), "Conectando a %s...", pending_ssid);
 
-        wifi_config_t wc = {0};
+        wifi_config_t wc{};
         strlcpy((char*)wc.sta.ssid, pending_ssid, sizeof(wc.sta.ssid));
         strlcpy((char*)wc.sta.password, pending_pass, sizeof(wc.sta.password));
         wc.sta.pmf_cfg.capable = true;
         wc.sta.pmf_cfg.required = false;
 
-        ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wc));
+        esp_err_t set_cfg_err = esp_wifi_set_config(WIFI_IF_STA, &wc);
+        if (set_cfg_err != ESP_OK) {
+          cfg_wifi_state = CFG_WIFI_FAIL;
+          snprintf(cfg_info, sizeof(cfg_info), "No se pudo aplicar WiFi (%s)", esp_err_to_name(set_cfg_err));
+          ESP_LOGW(TAG, "esp_wifi_set_config failed: %s", esp_err_to_name(set_cfg_err));
+          vTaskDelay(pdMS_TO_TICKS(100));
+          continue;
+        }
 
         cfg_wifi_state = CFG_WIFI_CONNECTING;
         s_connect_t0 = now_ms();
@@ -404,8 +505,14 @@ static void wifi_mgr_task(void *pv)
         // Limpia estado anterior y conecta
         esp_wifi_disconnect();
         vTaskDelay(pdMS_TO_TICKS(50));
-        ESP_ERROR_CHECK(esp_wifi_connect());
-        ESP_LOGI(TAG, "esp_wifi_connect() requested");
+        esp_err_t connect_err = esp_wifi_connect();
+        if (connect_err != ESP_OK) {
+          cfg_wifi_state = CFG_WIFI_FAIL;
+          snprintf(cfg_info, sizeof(cfg_info), "No se pudo conectar (%s)", esp_err_to_name(connect_err));
+          ESP_LOGW(TAG, "esp_wifi_connect failed: %s", esp_err_to_name(connect_err));
+        } else {
+          ESP_LOGI(TAG, "esp_wifi_connect() requested");
+        }
       }
     }
 
