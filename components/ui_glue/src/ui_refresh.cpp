@@ -17,6 +17,7 @@ static bool first_refresh = true;
 static bool s_service_evaluated_this_boot = false;  // evaluar vencimiento (1 vez)
 static bool s_service_popup_attempted_this_boot = false; // mostrar popup (1 vez)
 static bool s_ota_callbacks_bound = false;
+static bool s_ota_local_started = false;
 static bool s_ota_checked_this_boot = false;
 
 static void service_popup_show() {
@@ -85,6 +86,19 @@ static void ui_net_time_update(ui_state_t &s)
 
   strftime(s.timeStr, sizeof(s.timeStr), "%H:%M", &t);
   strftime(s.dateStr, sizeof(s.dateStr), "%d/%m/%Y", &t);
+}
+
+static void ota_local_server_sync()
+{
+  if (wifi_ok) {
+    if (!s_ota_local_started) {
+      ota_local_start();
+      s_ota_local_started = true;
+    }
+  } else if (s_ota_local_started) {
+    ota_local_stop();
+    s_ota_local_started = false;
+  }
 }
 
 // --------- iconos wifi ----------
@@ -185,6 +199,10 @@ static void programado_refresh_labels()
 extern "C" void ui_refresh_cb(lv_timer_t *t)
 {
   (void)t;
+
+  if (g_ui_mutex == nullptr) {
+    return;
+  }
 
   ui_state_t s;
 
@@ -328,13 +346,14 @@ extern "C" void ui_refresh_cb(lv_timer_t *t)
     lv_obj_add_event_cb(ui_btnServicePostergar, service_postergar, LV_EVENT_CLICKED, NULL);
 
     if (!s_ota_callbacks_bound) {
-      ota_local_start();
       if (ui_btnOtaCheck) lv_obj_add_flag(ui_btnOtaCheck, LV_OBJ_FLAG_HIDDEN);
       s_ota_callbacks_bound = true;
     }
 
     service_popup_hide();
   }
+
+  ota_local_server_sync();
   
 
   // HOME: dotOta visible solo cuando hay update

@@ -3,7 +3,7 @@ param(
     [string]$RepoOwner = "jympcb",
     [string]$RepoName = "Willielectrical",
     [string]$AssetName = "will.bin",
-    [string]$Notes = "Auto-generated OTA manifest",
+    [string]$Notes,
     [ValidateSet("pages", "release")]
     [string]$Delivery = "pages"
 )
@@ -30,6 +30,10 @@ if (-not $Version -or $Version.Trim().Length -eq 0) {
         throw "No pude extraer FW_VERSION desde $appGlobals"
     }
     $Version = $match.Groups[1].Value
+}
+
+if (-not $PSBoundParameters.ContainsKey('Notes') -or [string]::IsNullOrWhiteSpace($Notes)) {
+    $Notes = "Version disponible: $Version"
 }
 
 if ($Delivery -eq "release") {

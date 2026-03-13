@@ -1,5 +1,5 @@
 ﻿{
-    "version":  "0.1.8",
-    "bin_url":  "https://jympcb.github.io/Willielectrical/ota/will-0.1.8.bin",
-    "notes":  "Auto-generated OTA manifest"
+    "version":  "0.1.10",
+    "bin_url":  "https://jympcb.github.io/Willielectrical/ota/will.bin",
+    "notes":  "Version disponible: 0.1.10"
 }

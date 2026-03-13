@@ -15,5 +15,6 @@
     "--compile-commands-dir=c:\\Users\\JYM-DSN\\Will I electrical\\build"
   ],
   "idf.flashType": "UART",
-  "C_Cpp.errorSquiggles": "disabled"
+  "C_Cpp.errorSquiggles": "disabled",
+  "idf.monitorPort": "COM211"
 }
