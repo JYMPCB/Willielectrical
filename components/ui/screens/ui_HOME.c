@@ -6,13 +6,9 @@
 #include "../ui.h"
 
 lv_obj_t * ui_groupPausa;
-lv_obj_t * ui_rgbRing;
 lv_obj_t * ui_HOME = NULL;
 lv_obj_t * ui_Image2 = NULL;
 lv_obj_t * ui_Group_Gauge = NULL;
-lv_obj_t * ui_rgbRing = NULL;
-lv_obj_t * ui_imgGaugeSpeed = NULL;
-lv_obj_t * ui_imgCursorSpeed = NULL;
 lv_obj_t * ui_Group_Speed = NULL;
 lv_obj_t * ui_Container1 = NULL;
 lv_obj_t * ui_lblSpeedUnit = NULL;
@@ -195,37 +191,6 @@ void ui_HOME_screen_init(void)
     lv_obj_set_align(ui_Group_Gauge, LV_ALIGN_LEFT_MID);
     lv_obj_clear_flag(ui_Group_Gauge, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);      /// Flags
 
-    ui_rgbRing = lv_obj_create(ui_Group_Gauge);
-    lv_obj_set_width(ui_rgbRing, lv_pct(100));
-    lv_obj_set_height(ui_rgbRing, lv_pct(100));
-    lv_obj_set_x(ui_rgbRing, 1);
-    lv_obj_set_y(ui_rgbRing, 1);
-    lv_obj_set_align(ui_rgbRing, LV_ALIGN_CENTER);
-    lv_obj_clear_flag(ui_rgbRing, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
-    lv_obj_set_style_bg_color(ui_rgbRing, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(ui_rgbRing, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_img_src(ui_rgbRing, &ui_img_rgb_png, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    ui_imgGaugeSpeed = lv_img_create(ui_Group_Gauge);
-    lv_img_set_src(ui_imgGaugeSpeed, &ui_img_gauge_velocidad_png);
-    lv_obj_set_width(ui_imgGaugeSpeed, LV_SIZE_CONTENT);   /// 1
-    lv_obj_set_height(ui_imgGaugeSpeed, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_align(ui_imgGaugeSpeed, LV_ALIGN_CENTER);
-    lv_obj_add_flag(ui_imgGaugeSpeed, LV_OBJ_FLAG_ADV_HITTEST);     /// Flags
-    lv_obj_clear_flag(ui_imgGaugeSpeed, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
-    lv_img_set_zoom(ui_imgGaugeSpeed, 350);
-
-    ui_imgCursorSpeed = lv_img_create(ui_Group_Gauge);
-    lv_img_set_src(ui_imgCursorSpeed, &ui_img_speed_indicator_png);
-    lv_obj_set_width(ui_imgCursorSpeed, LV_SIZE_CONTENT);   /// 1
-    lv_obj_set_height(ui_imgCursorSpeed, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_imgCursorSpeed, lv_pct(0));
-    lv_obj_set_y(ui_imgCursorSpeed, lv_pct(3));
-    lv_obj_set_align(ui_imgCursorSpeed, LV_ALIGN_CENTER);
-    lv_obj_add_flag(ui_imgCursorSpeed, LV_OBJ_FLAG_ADV_HITTEST);     /// Flags
-    lv_obj_clear_flag(ui_imgCursorSpeed, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
-    lv_img_set_zoom(ui_imgCursorSpeed, 400);
-
     ui_Group_Speed = lv_obj_create(ui_Group_Gauge);
     lv_obj_remove_style_all(ui_Group_Speed);
     lv_obj_set_width(ui_Group_Speed, lv_pct(100));
@@ -322,6 +287,7 @@ void ui_HOME_screen_init(void)
     lv_obj_set_align(ui_Group_Real_Time2, LV_ALIGN_RIGHT_MID);
     lv_obj_set_flex_flow(ui_Group_Real_Time2, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(ui_Group_Real_Time2, LV_FLEX_ALIGN_SPACE_AROUND, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
+    lv_obj_add_flag(ui_Group_Real_Time2, LV_OBJ_FLAG_HIDDEN);     /// Flags
     lv_obj_clear_flag(ui_Group_Real_Time2, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
     lv_obj_set_style_bg_color(ui_Group_Real_Time2, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(ui_Group_Real_Time2, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -806,8 +772,8 @@ void ui_HOME_screen_init(void)
     ui_lblPostergar = lv_label_create(ui_pnlServiceOdo);
     lv_obj_set_width(ui_lblPostergar, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_lblPostergar, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_lblPostergar, -179);
-    lv_obj_set_y(ui_lblPostergar, 73);
+    lv_obj_set_x(ui_lblPostergar, -234);
+    lv_obj_set_y(ui_lblPostergar, 93);
     lv_obj_set_align(ui_lblPostergar, LV_ALIGN_CENTER);
     lv_label_set_text(ui_lblPostergar, "POSTERGAR");
     lv_obj_set_style_text_color(ui_lblPostergar, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -834,8 +800,8 @@ void ui_HOME_screen_init(void)
     ui_lblAceptar = lv_label_create(ui_pnlServiceOdo);
     lv_obj_set_width(ui_lblAceptar, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_lblAceptar, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_lblAceptar, 177);
-    lv_obj_set_y(ui_lblAceptar, 73);
+    lv_obj_set_x(ui_lblAceptar, 238);
+    lv_obj_set_y(ui_lblAceptar, 93);
     lv_obj_set_align(ui_lblAceptar, LV_ALIGN_CENTER);
     lv_label_set_text(ui_lblAceptar, "ACEPTAR");
     lv_obj_set_style_text_color(ui_lblAceptar, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -865,12 +831,16 @@ void ui_HOME_screen_init(void)
     ui_dotOta = lv_btn_create(ui_HOME);
     lv_obj_set_width(ui_dotOta, 72);
     lv_obj_set_height(ui_dotOta, 61);
-    lv_obj_set_x(ui_dotOta, -1);
-    lv_obj_set_y(ui_dotOta, 42);
+    lv_obj_set_x(ui_dotOta, 2);
+    lv_obj_set_y(ui_dotOta, 53);
     lv_obj_add_flag(ui_dotOta, LV_OBJ_FLAG_HIDDEN);     /// Flags
     lv_obj_set_style_bg_color(ui_dotOta, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(ui_dotOta, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_img_src(ui_dotOta, &ui_img_icn_update_png, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_img_src(ui_dotOta, &ui_img_icn_update_png, LV_PART_MAIN | LV_STATE_PRESSED);
+    lv_obj_set_style_bg_img_opa(ui_dotOta, 255, LV_PART_MAIN | LV_STATE_PRESSED);
+    lv_obj_set_style_bg_img_recolor(ui_dotOta, lv_color_hex(0x4040FF), LV_PART_MAIN | LV_STATE_PRESSED);
+    lv_obj_set_style_bg_img_recolor_opa(ui_dotOta, 255, LV_PART_MAIN | LV_STATE_PRESSED);
 
     lv_obj_add_event_cb(ui_btnConfig, ui_event_btnConfig, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_btnReinicio, ui_event_btnReinicio, LV_EVENT_ALL, NULL);
@@ -879,7 +849,6 @@ void ui_HOME_screen_init(void)
     lv_obj_add_event_cb(ui_btnServicePostergar, ui_event_btnServicePostergar, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_btnServiceAceptar, ui_event_btnServiceAceptar, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_dotOta, ui_event_dotOta, LV_EVENT_ALL, NULL);
-    ui_rgbRing = ui_rgbRing;
     ui_groupPausa = ui_groupPausa;
 
 }
@@ -892,10 +861,6 @@ void ui_HOME_screen_destroy(void)
     ui_HOME = NULL;
     ui_Image2 = NULL;
     ui_Group_Gauge = NULL;
-    ui_rgbRing = NULL;
-    ui_rgbRing = NULL;
-    ui_imgGaugeSpeed = NULL;
-    ui_imgCursorSpeed = NULL;
     ui_Group_Speed = NULL;
     ui_Container1 = NULL;
     ui_lblSpeedUnit = NULL;

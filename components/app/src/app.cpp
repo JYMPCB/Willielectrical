@@ -16,6 +16,7 @@ extern "C" {
 #define EN_AUDIO   1
 #define EN_TASKS   1
 #define EN_WIFI    1
+#define EN_RS485   1
 #define EN_SERVICES 0
 #define EN_TI 0
 
@@ -32,6 +33,10 @@ extern "C" {
 #endif
 #if EN_WIFI
 #include "wifi_mgr.h"
+#endif
+#if EN_RS485
+#include "handlebar_link.h"
+#include "vfd_link.h"
 #endif
 
 #if EN_SERVICES
@@ -110,6 +115,38 @@ void app_init()
 
   #if EN_WIFI
   wifi_mgr_start_task();
+  #endif
+
+  #if EN_RS485
+  if (handlebar_link_init()) {
+    BaseType_t rc = xTaskCreatePinnedToCore(handlebar_link_task,
+                                            "handlebar",
+                                            4096,
+                                            NULL,
+                                            4,
+                                            NULL,
+                                            0);
+    if (rc != pdPASS) {
+      ESP_LOGE(TAG, "Failed to create handlebar task");
+    }
+  } else {
+    ESP_LOGE(TAG, "handlebar_link_init failed (RS485 disabled)");
+  }
+
+  if (vfd_link_init()) {
+    BaseType_t rc = xTaskCreatePinnedToCore(vfd_link_task,
+                                            "vfd",
+                                            4096,
+                                            NULL,
+                                            2,
+                                            NULL,
+                                            0);
+    if (rc != pdPASS) {
+      ESP_LOGE(TAG, "Failed to create vfd task");
+    }
+  } else {
+    ESP_LOGE(TAG, "vfd_link_init failed (VFD disabled)");
+  }
   #endif
 
   

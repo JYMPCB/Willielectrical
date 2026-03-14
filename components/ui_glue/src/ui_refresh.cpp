@@ -51,7 +51,7 @@ static void service_popup_update_text()
 }
 
 //---------ARO RGB-------------
-extern lv_obj_t * ui_rgbRing;
+static lv_obj_t * ui_rgbRing = nullptr;
 
 static inline void ring_apply_color(uint8_t r, uint8_t g, uint8_t b){
   if(!ui_rgbRing) return;
@@ -573,7 +573,6 @@ extern "C" void ui_refresh_cb(lv_timer_t *t)
 
     if(s.cursorAngle != last_cursorAngle) {
       last_cursorAngle = s.cursorAngle;
-      lv_img_set_angle(ui_imgCursorSpeed, s.cursorAngle);
     }
   }
 

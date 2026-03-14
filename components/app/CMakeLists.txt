@@ -9,6 +9,8 @@ idf_component_register(
     display_port
     audio
     tasks
+    handlebar_link
+    vfd_link
     wifi_mgr
     training
     service

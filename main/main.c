@@ -5,9 +5,6 @@
 #include "app.h"
 
 #include "esp_log.h"
-#include "handlebar_link.h"
-
-static const char *TAG = "main";
 
 #ifdef __cplusplus
 extern "C" {
@@ -18,17 +15,6 @@ void app_main(void)
 {
   // Inicialización de la app (ahora exclusivamente ESP-IDF)
   app_init();
-
-    /// Handlebar Link
-    ESP_LOGI(TAG, "init handlebar link...");
-
-    if (!handlebar_link_init()) {
-        ESP_LOGE(TAG, "handlebar_link_init failed");
-        return;
-    }
-
-    xTaskCreate(handlebar_link_task, "handlebar_link_task", 4096, NULL, 5, NULL);  
-    ////
 
   // Si tu app vive por tasks, no necesitás loop.
   while (true) {

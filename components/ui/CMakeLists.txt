@@ -7,9 +7,6 @@ SET(SOURCES screens/ui_INICIO.c
     ui_helpers.c
     images/ui_img_logoj2f_png.c
     images/ui_img_bg2_png.c
-    images/ui_img_rgb_png.c
-    images/ui_img_gauge_velocidad_png.c
-    images/ui_img_speed_indicator_png.c
     images/ui_img_icn_wifi_png.c
     images/ui_img_icn_settings_png.c
     images/ui_img_icn_reinit_png.c
@@ -34,8 +31,16 @@ SET(SOURCES screens/ui_INICIO.c
     fonts/ui_font_Units.c)
 
 idf_component_register(
-    SRCS ${SOURCES}
-    INCLUDE_DIRS "."
-    REQUIRES lvgl__lvgl events
+    SRCS
+        ${SOURCES}
+    INCLUDE_DIRS
+        "."
+        "components"
+        "screens"
+        "fonts"
+        "images"
+    REQUIRES
+        events
+        lvgl__lvgl
     WHOLE_ARCHIVE
 )

@@ -1,12 +1,157 @@
 #include "handlebar_link.h"
 #include "bus_master.h"
+#include "vfd_link.h"
 #include "pins_config.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include <string.h>
 
 static const char *TAG = "handlebar_link";
+
+#define TREADMILL_SPEED_STEP_X100      50
+#define TREADMILL_SPEED_MIN_X100       100
+#define TREADMILL_SPEED_MAX_X100       2200
+#define HANDLEBAR_POLL_MS              20
+#define CMD_TRACE_TIMEOUT_US           3000000LL
+
+static int32_t s_target_speed_x100 = TREADMILL_SPEED_MIN_X100;
+
+typedef struct {
+    bool active;
+    uint8_t ev_type;
+    uint8_t expected_run_fb;
+    int64_t t_event_us;
+    int64_t t_ack_us;
+} cmd_trace_t;
+
+static cmd_trace_t s_cmd_trace;
+
+static int32_t clamp_i32(int32_t v, int32_t lo, int32_t hi)
+{
+    if (v < lo) return lo;
+    if (v > hi) return hi;
+    return v;
+}
+
+static const char *event_name(uint8_t ev_type)
+{
+    switch (ev_type) {
+        case HANDLE_EV_START: return "START";
+        case HANDLE_EV_STOP: return "STOP";
+        case HANDLE_EV_MODE: return "MODE";
+        case HANDLE_EV_UP: return "UP";
+        case HANDLE_EV_DOWN: return "DOWN";
+        default: return "UNKNOWN";
+    }
+}
+
+static void trace_cmd_start(uint8_t ev_type, uint8_t expected_run_fb, int64_t t_event_us, int64_t t_ack_us)
+{
+    s_cmd_trace.active = true;
+    s_cmd_trace.ev_type = ev_type;
+    s_cmd_trace.expected_run_fb = expected_run_fb;
+    s_cmd_trace.t_event_us = t_event_us;
+    s_cmd_trace.t_ack_us = t_ack_us;
+}
+
+static void trace_cmd_feedback_if_ready(void)
+{
+    if (!s_cmd_trace.active) {
+        return;
+    }
+
+    int64_t now_us = esp_timer_get_time();
+    if ((now_us - s_cmd_trace.t_event_us) > CMD_TRACE_TIMEOUT_US) {
+        ESP_LOGW(TAG,
+                 "lat %s timeout waiting run_fb=%u (event->ack=%.1f ms)",
+                 event_name(s_cmd_trace.ev_type),
+                 (unsigned)s_cmd_trace.expected_run_fb,
+                 (double)(s_cmd_trace.t_ack_us - s_cmd_trace.t_event_us) / 1000.0);
+        s_cmd_trace.active = false;
+        return;
+    }
+
+    vfd_status_t vfd_st;
+    if (!vfd_link_get_status(&vfd_st)) {
+        return;
+    }
+
+    if (vfd_st.run_fb != s_cmd_trace.expected_run_fb) {
+        return;
+    }
+
+    double t_event_ack_ms = (double)(s_cmd_trace.t_ack_us - s_cmd_trace.t_event_us) / 1000.0;
+    double t_ack_feedback_ms = (double)(now_us - s_cmd_trace.t_ack_us) / 1000.0;
+    double t_total_ms = (double)(now_us - s_cmd_trace.t_event_us) / 1000.0;
+
+    ESP_LOGI(TAG,
+             "lat %s ok: event->ack=%.1f ms ack->run_fb=%.1f ms total=%.1f ms",
+             event_name(s_cmd_trace.ev_type),
+             t_event_ack_ms,
+             t_ack_feedback_ms,
+             t_total_ms);
+    s_cmd_trace.active = false;
+}
+
+static void handle_event_drive_treadmill(const bus_event_item_t *ev)
+{
+    if (!ev) {
+        return;
+    }
+
+    int64_t t_event_us = esp_timer_get_time();
+
+    switch (ev->type) {
+        case HANDLE_EV_START:
+            if (vfd_link_set_speed_kmh_x100(s_target_speed_x100) && vfd_link_start()) {
+                int64_t t_ack_us = esp_timer_get_time();
+                trace_cmd_start(HANDLE_EV_START, 1, t_event_us, t_ack_us);
+                ESP_LOGI(TAG, "cmd START ok, speed=%.2f km/h", (double)s_target_speed_x100 / 100.0);
+            } else {
+                ESP_LOGW(TAG, "cmd START failed");
+            }
+            break;
+
+        case HANDLE_EV_STOP:
+            if (vfd_link_stop()) {
+                int64_t t_ack_us = esp_timer_get_time();
+                trace_cmd_start(HANDLE_EV_STOP, 0, t_event_us, t_ack_us);
+                ESP_LOGI(TAG, "cmd STOP ok");
+            } else {
+                ESP_LOGW(TAG, "cmd STOP failed");
+            }
+            break;
+
+        case HANDLE_EV_UP:
+            s_target_speed_x100 = clamp_i32(s_target_speed_x100 + TREADMILL_SPEED_STEP_X100,
+                                            TREADMILL_SPEED_MIN_X100,
+                                            TREADMILL_SPEED_MAX_X100);
+            if (vfd_link_set_speed_kmh_x100(s_target_speed_x100)) {
+                ESP_LOGI(TAG, "cmd SPEED UP -> %.2f km/h", (double)s_target_speed_x100 / 100.0);
+            } else {
+                ESP_LOGW(TAG, "cmd SPEED UP failed (target=%.2f km/h)",
+                         (double)s_target_speed_x100 / 100.0);
+            }
+            break;
+
+        case HANDLE_EV_DOWN:
+            s_target_speed_x100 = clamp_i32(s_target_speed_x100 - TREADMILL_SPEED_STEP_X100,
+                                            TREADMILL_SPEED_MIN_X100,
+                                            TREADMILL_SPEED_MAX_X100);
+            if (vfd_link_set_speed_kmh_x100(s_target_speed_x100)) {
+                ESP_LOGI(TAG, "cmd SPEED DOWN -> %.2f km/h", (double)s_target_speed_x100 / 100.0);
+            } else {
+                ESP_LOGW(TAG, "cmd SPEED DOWN failed (target=%.2f km/h)",
+                         (double)s_target_speed_x100 / 100.0);
+            }
+            break;
+
+        default:
+            break;
+    }
+}
 
 typedef struct {
     bool inited;
@@ -216,12 +361,26 @@ void handlebar_link_task(void *arg)
     (void)arg;
 
     bool info_read = false;
+    bool was_offline = false;
+    TickType_t last_offline_log = 0;
 
     while (1) {
         if (!handlebar_link_ping()) {
-            ESP_LOGW(TAG, "handlebar offline");
+            TickType_t now = xTaskGetTickCount();
+            if ((now - last_offline_log) >= pdMS_TO_TICKS(3000)) {
+                last_offline_log = now;
+                ESP_LOGW(TAG, "handlebar offline (ok=%lu fail=%lu)",
+                         (unsigned long)s_ctx.ok_count,
+                         (unsigned long)s_ctx.fail_count);
+            }
+            was_offline = true;
             vTaskDelay(pdMS_TO_TICKS(500));
             continue;
+        }
+
+        if (was_offline) {
+            ESP_LOGI(TAG, "handlebar online again");
+            was_offline = false;
         }
 
         if (!info_read) {
@@ -240,12 +399,33 @@ void handlebar_link_task(void *arg)
                 bus_event_item_t events[15];
                 int n = handlebar_link_read_events(events, 15);
 
+                int stop_idx = -1;
                 for (int i = 0; i < n; i++) {
-                    ESP_LOGI(TAG, "ev[%d]: type=%u param=%u t=%u",
-                             i,
+                    if (events[i].type == HANDLE_EV_STOP) {
+                        stop_idx = i;
+                        break;
+                    }
+                }
+
+                if (stop_idx >= 0) {
+                    ESP_LOGI(TAG, "ev type=%u param=%u t=%u",
+                             events[stop_idx].type,
+                             events[stop_idx].param,
+                             events[stop_idx].time_ms);
+                    handle_event_drive_treadmill(&events[stop_idx]);
+                }
+
+                for (int i = 0; i < n; i++) {
+                    if (i == stop_idx) {
+                        continue;
+                    }
+
+                    ESP_LOGI(TAG, "ev type=%u param=%u t=%u",
                              events[i].type,
                              events[i].param,
                              events[i].time_ms);
+
+                    handle_event_drive_treadmill(&events[i]);
 
                     // Acá luego integrás con tu lógica real del HMI.
                     // Ejemplo:
@@ -266,6 +446,8 @@ void handlebar_link_task(void *arg)
             }
         }
 
-        vTaskDelay(pdMS_TO_TICKS(50));
+        trace_cmd_feedback_if_ready();
+
+        vTaskDelay(pdMS_TO_TICKS(HANDLEBAR_POLL_MS));
     }
 }

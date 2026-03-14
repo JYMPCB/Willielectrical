@@ -16,9 +16,6 @@ extern void ui_HOME_screen_destroy(void);
 extern lv_obj_t * ui_HOME;
 extern lv_obj_t * ui_Image2;
 extern lv_obj_t * ui_Group_Gauge;
-extern lv_obj_t * ui_rgbRing;
-extern lv_obj_t * ui_imgGaugeSpeed;
-extern lv_obj_t * ui_imgCursorSpeed;
 extern lv_obj_t * ui_Group_Speed;
 extern lv_obj_t * ui_Container1;
 extern lv_obj_t * ui_lblSpeedUnit;
@@ -81,7 +78,6 @@ extern lv_obj_t * ui_lblOdoMaquina2;
 extern void ui_event_dotOta(lv_event_t * e);
 extern lv_obj_t * ui_dotOta;
 // CUSTOM VARIABLES
-extern lv_obj_t * ui_rgbRing;
 extern lv_obj_t * ui_groupPausa;
 
 #ifdef __cplusplus
