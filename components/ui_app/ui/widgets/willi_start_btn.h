@@ -38,6 +38,8 @@ typedef struct {
 
 willi_start_btn_t *willi_start_btn_create(lv_obj_t *parent);
 
+lv_obj_t *willi_start_btn_get_root(willi_start_btn_t *btn);
+
 void willi_start_btn_set_title(willi_start_btn_t *btn, const char *txt);
 void willi_start_btn_set_subtitle(willi_start_btn_t *btn, const char *txt);
 

@@ -849,3 +849,8 @@ void willi_start_btn_start_spray_anim(willi_start_btn_t *btn)
         lv_anim_start(&a);
     }
 }
+
+lv_obj_t *willi_start_btn_get_root(willi_start_btn_t *btn)
+{
+    return btn ? btn->start_btn : NULL;
+}
