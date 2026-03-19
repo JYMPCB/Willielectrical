@@ -1,3 +1,4 @@
+#include "../../willi_common/include/willi_opacity.h"
 #include "willi_metric_card.h"
 
 static void anim_y_cb(void *var, int32_t v)
@@ -10,13 +11,20 @@ static void anim_opa_cb(void *var, int32_t v)
     lv_obj_set_style_opa((lv_obj_t *)var, (lv_opa_t)v, 0);
 }
 
+static void stop_anims(lv_obj_t *obj)
+{
+    if(!obj) return;
+    lv_anim_del(obj, anim_y_cb);
+    lv_anim_del(obj, anim_opa_cb);
+}
+
 void willi_metric_card_create(willi_metric_card_t *card, lv_obj_t *parent)
 {
     if(!card) return;
 
     card->root = lv_obj_create(parent);
     lv_obj_remove_style_all(card->root);
-    lv_obj_set_size(card->root, 140, 130);
+    lv_obj_set_size(card->root, 160, 150);
     lv_obj_clear_flag(card->root, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_bg_opa(card->root, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(card->root, 0, 0);
@@ -24,21 +32,28 @@ void willi_metric_card_create(willi_metric_card_t *card, lv_obj_t *parent)
 
     card->label_title = lv_label_create(card->root);
     lv_label_set_text(card->label_title, "TITLE");
-    lv_obj_set_style_text_font(card->label_title, &lv_font_montserrat_22, 0);
+    lv_obj_set_width(card->label_title, LV_PCT(100));
+    lv_obj_set_style_text_align(card->label_title, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_font(card->label_title, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_letter_space(card->label_title, 1, 0);
     lv_obj_set_style_text_color(card->label_title, lv_color_hex(0xEAEAEA), 0);
-    lv_obj_align(card->label_title, LV_ALIGN_TOP_MID, 0, 0);
+    lv_obj_align(card->label_title, LV_ALIGN_TOP_MID, 0, 2);
 
     card->label_value = lv_label_create(card->root);
     lv_label_set_text(card->label_value, "0.0");
+    lv_obj_set_width(card->label_value, LV_PCT(100));
+    lv_obj_set_style_text_align(card->label_value, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_font(card->label_value, &lv_font_montserrat_48, 0);
     lv_obj_set_style_text_color(card->label_value, lv_color_hex(0x8DFF2F), 0);
-    lv_obj_align(card->label_value, LV_ALIGN_TOP_MID, 0, 26);
+    lv_obj_align(card->label_value, LV_ALIGN_TOP_MID, 0, 28);
 
     card->label_unit = lv_label_create(card->root);
     lv_label_set_text(card->label_unit, "unit");
-    lv_obj_set_style_text_font(card->label_unit, &lv_font_montserrat_24, 0);
+    lv_obj_set_width(card->label_unit, LV_PCT(100));
+    lv_obj_set_style_text_align(card->label_unit, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_font(card->label_unit, &lv_font_montserrat_18, 0);
     lv_obj_set_style_text_color(card->label_unit, lv_color_hex(0xD8D8D8), 0);
-    lv_obj_align(card->label_unit, LV_ALIGN_TOP_MID, 0, 86);
+    lv_obj_align(card->label_unit, LV_ALIGN_TOP_MID, 0, 106);
 
     card->final_x = 0;
     card->final_y = 0;
@@ -84,7 +99,8 @@ void willi_metric_card_set_pos(willi_metric_card_t *card, lv_coord_t x, lv_coord
 
 void willi_metric_card_set_size(willi_metric_card_t *card, lv_coord_t w, lv_coord_t h)
 {
-    if(card && card->root) lv_obj_set_size(card->root, w, h);
+    if(!card || !card->root) return;
+    lv_obj_set_size(card->root, w, h);
 }
 
 void willi_metric_card_hide(willi_metric_card_t *card)
@@ -95,8 +111,10 @@ void willi_metric_card_hide(willi_metric_card_t *card)
 void willi_metric_card_show(willi_metric_card_t *card)
 {
     if(card && card->root) {
+        stop_anims(card->root);
         lv_obj_clear_flag(card->root, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_opa(card->root, LV_OPA_COVER, 0);
+        lv_obj_set_pos(card->root, card->final_x, card->final_y);
     }
 }
 
@@ -104,6 +122,7 @@ void willi_metric_card_prepare_in_anim(willi_metric_card_t *card, lv_coord_t y_o
 {
     if(!card || !card->root) return;
 
+    stop_anims(card->root);
     lv_obj_clear_flag(card->root, LV_OBJ_FLAG_HIDDEN);
     lv_obj_set_pos(card->root, card->final_x, card->final_y + y_offset);
     lv_obj_set_style_opa(card->root, LV_OPA_0, 0);
@@ -112,6 +131,8 @@ void willi_metric_card_prepare_in_anim(willi_metric_card_t *card, lv_coord_t y_o
 void willi_metric_card_animate_in(willi_metric_card_t *card, uint32_t delay_ms)
 {
     if(!card || !card->root) return;
+
+    stop_anims(card->root);
 
     lv_anim_t a;
 
@@ -138,6 +159,7 @@ void willi_metric_card_prepare_out_anim(willi_metric_card_t *card, lv_coord_t y_
 {
     if(!card || !card->root) return;
 
+    stop_anims(card->root);
     lv_obj_clear_flag(card->root, LV_OBJ_FLAG_HIDDEN);
     lv_obj_set_pos(card->root, card->final_x, card->final_y);
     lv_obj_set_style_opa(card->root, LV_OPA_COVER, 0);
@@ -145,9 +167,17 @@ void willi_metric_card_prepare_out_anim(willi_metric_card_t *card, lv_coord_t y_
     (void)y_offset;
 }
 
+static void hide_card_ready_cb(lv_anim_t *a)
+{
+    lv_obj_t *obj = (lv_obj_t *)a->var;
+    if(obj) lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+}
+
 void willi_metric_card_animate_out(willi_metric_card_t *card, uint32_t delay_ms)
 {
     if(!card || !card->root) return;
+
+    stop_anims(card->root);
 
     lv_anim_t a;
 
@@ -167,5 +197,6 @@ void willi_metric_card_animate_out(willi_metric_card_t *card, uint32_t delay_ms)
     lv_anim_set_time(&a, 180);
     lv_anim_set_delay(&a, delay_ms);
     lv_anim_set_path_cb(&a, lv_anim_path_linear);
+    lv_anim_set_ready_cb(&a, hide_card_ready_cb);
     lv_anim_start(&a);
 }
