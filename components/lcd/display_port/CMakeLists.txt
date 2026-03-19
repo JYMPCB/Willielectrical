@@ -5,7 +5,7 @@ idf_component_register(
     "include"
   REQUIRES
     willi_common
-    ui
+    ui_app
     MIPI
     touch
     lvgl

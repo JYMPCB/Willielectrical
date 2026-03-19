@@ -9,7 +9,7 @@
 #include "pins_config.h"
 #include "jd9165_lcd.h"
 #include "gt911_touch.h"
-#include "ui.h"
+#include "app_ui.h"
 
 static const char *TAG = "display_port";
 
@@ -158,7 +158,7 @@ bool display_port_init(void)
   lv_indev_drv_register(&indev_drv);
   
   ESP_LOGI(TAG, "display init done");
-  ui_init();
+  app_ui_init();
 
   return true;
 }

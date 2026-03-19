@@ -1,21 +1,113 @@
 {
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "OTA: Sync latest.json",
-      "type": "shell",
-      "command": "powershell",
-      "args": [
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "tools/sync_ota_manifest.ps1",
-        "-Delivery",
-        "pages"
-      ],
-      "group": "build",
-      "problemMatcher": []
-    }
-  ]
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "OTA: Sync latest.json",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"tools/sync_ota_manifest.ps1",
+				"-Delivery",
+				"pages"
+			],
+			"group": "build",
+			"problemMatcher": []
+		},
+		{
+			"label": "LVGL Sim: Start",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"tools/lvgl_sim.ps1",
+				"-Action",
+				"start"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"clear": true,
+				"reveal": "always",
+				"panel": "dedicated"
+			}
+		},
+		{
+			"label": "LVGL Sim: Configure",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"tools/lvgl_sim.ps1",
+				"-Action",
+				"configure"
+			],
+			"group": "build",
+			"problemMatcher": [
+				"$gcc"
+			],
+			"presentation": {
+				"clear": true,
+				"reveal": "always",
+				"panel": "dedicated"
+			}
+		},
+		{
+			"label": "LVGL Sim: Build",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"tools/lvgl_sim.ps1",
+				"-Action",
+				"build"
+			],
+			"group": "build",
+			"problemMatcher": [
+				"$gcc"
+			],
+			"dependsOn": "LVGL Sim: Configure",
+			"presentation": {
+				"clear": true,
+				"reveal": "always",
+				"panel": "dedicated"
+			}
+		},
+		{
+			"label": "LVGL Sim: Run",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"tools/lvgl_sim.ps1",
+				"-Action",
+				"run"
+			],
+			"group": "build",
+			"problemMatcher": [],
+			"presentation": {
+				"clear": true,
+				"reveal": "always",
+				"panel": "dedicated"
+			}
+		}
+	]
 }

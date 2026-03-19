@@ -1,0 +1,15 @@
+idf_component_register(
+  SRCS
+    "app/app_ui.c"
+    "assets/images/bg_png.c"
+    "ui/screens/ui_home.c"
+    "ui/widgets/willi_start_btn.c"
+  INCLUDE_DIRS
+    "app"
+    "assets/images"
+    "ui/screens"
+    "ui/widgets"
+  REQUIRES
+    lvgl
+    willi_common
+)

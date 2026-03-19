@@ -26,7 +26,7 @@ extern "C" {
 #if EN_AUDIO
 #include "audio_mgr.h"
 #endif
-#include "ui_refresh.h"
+//#include "ui_refresh.h"
 #if EN_TASKS
 #include "app_globals.h"
 #include "tasks.h"  
@@ -109,7 +109,7 @@ void app_init()
   #endif
 
   #if EN_TASKS
-  ui_refresh_start_timer();
+  //ui_refresh_start_timer();
   startTasks();
   #endif
 

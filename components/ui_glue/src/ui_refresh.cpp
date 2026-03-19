@@ -204,6 +204,12 @@ extern "C" void ui_refresh_cb(lv_timer_t *t)
     return;
   }
 
+
+  // Guard: SquareLine UI no inicializada todavía (ui_init() pendiente de vincular).
+  // Todos los objetos legados (ui_HOME, ui_lblSpeedNumber, etc.) son NULL.
+  // Salir para evitar crashes hasta que se complete la migración.
+  if (!ui_HOME) return;
+
   ui_state_t s;
 
   bool config_active = (habConfig == 1) || (ui_CONFIG && lv_scr_act() == ui_CONFIG);
