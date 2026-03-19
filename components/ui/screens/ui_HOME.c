@@ -515,7 +515,7 @@ void ui_HOME_screen_init(void)
     lv_obj_set_height(ui_lblCaloriasTittle, lv_pct(30));
     lv_obj_set_width(ui_lblCaloriasTittle, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_align(ui_lblCaloriasTittle, LV_ALIGN_TOP_MID);
-    lv_label_set_text(ui_lblCaloriasTittle, "CALORÍAS");
+    lv_label_set_text(ui_lblCaloriasTittle, "CALORIAS");
     lv_obj_set_style_text_color(ui_lblCaloriasTittle, lv_color_hex(0x7E7C7E), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_lblCaloriasTittle, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_lblCaloriasTittle, &ui_font_Medium_26, LV_PART_MAIN | LV_STATE_DEFAULT);

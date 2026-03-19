@@ -2,8 +2,13 @@
 #include "lvgl.h"
 #include "willi_metric_card.h"
 
-#define WILLI_CURVE_PTS 48
-#define WILLI_CURVE_SEGS (WILLI_CURVE_PTS - 1)
+#define WILLI_CURVE_PTS 72
+
+#if defined(LVGL_VERSION_MAJOR) && (LVGL_VERSION_MAJOR >= 9)
+typedef lv_point_precise_t willi_curve_point_t;
+#else
+typedef lv_point_t willi_curve_point_t;
+#endif
 
 typedef struct {
     willi_metric_card_t speed;
@@ -19,20 +24,28 @@ typedef struct {
 
     lv_obj_t *time_panel;
 
-    lv_obj_t *curve_1_segs[WILLI_CURVE_SEGS];
-    lv_obj_t *curve_2_segs[WILLI_CURVE_SEGS];
-    lv_obj_t *curve_3_segs[WILLI_CURVE_SEGS];
+    lv_obj_t *curve_1;
+    lv_obj_t *curve_2;
+    lv_obj_t *curve_3;
+    lv_obj_t *curve_1_glow;
 
     lv_obj_t *travel_dot_1;
     lv_obj_t *travel_dot_2;
+    lv_obj_t *travel_dot_1_halo;
+    lv_obj_t *travel_dot_2_halo;
 
-    lv_point_t curve1_pts[WILLI_CURVE_PTS];
-    lv_point_t curve2_pts[WILLI_CURVE_PTS];
-    lv_point_t curve3_pts[WILLI_CURVE_PTS];
+    lv_obj_t *wifi_label;
+
+    willi_curve_point_t curve1_pts[WILLI_CURVE_PTS];
+    willi_curve_point_t curve2_pts[WILLI_CURVE_PTS];
+    willi_curve_point_t curve3_pts[WILLI_CURVE_PTS];
 
     lv_timer_t *curve_timer;
-    uint16_t dot_idx_1;
-    uint16_t dot_idx_2;
+    lv_timer_t *wifi_timer;
+
+    float dot_pos_1;
+    float dot_pos_2;
+    uint8_t wifi_phase;
 } willi_training_metrics_t;
 
 void willi_training_metrics_create(lv_obj_t *parent, willi_training_metrics_t *m);

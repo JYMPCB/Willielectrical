@@ -1,14 +1,18 @@
-#include "../../willi_common/include/willi_opacity.h"
+#include "../../../willi_common/include/willi_opacity.h"
 #include "willi_training_metrics.h"
+#include <math.h>
 #include "lvgl/src/misc/lv_timer_private.h"
 
 #define C_TITLE        0xEAEAEA
 #define C_WHITE        0xF2F2F2
 #define C_GREEN        0x8DFF2F
+#define C_GREEN_SOFT   0x5CFF72
 #define C_BLUE         0x61B8FF
+#define C_BLUE_SOFT    0x37D8FF
 #define C_ORANGE       0xFFB12A
 #define C_LINE         0xAEB7C8
 #define C_PANEL_BORDER 0xAAB4C8
+#define C_WIFI         0xEAF3FF
 
 #define TOP_Y          88
 #define CARD_W         220
@@ -26,24 +30,33 @@
 #define SEP_3_X        703
 
 #define TIME_PANEL_X   360
-#define TIME_PANEL_Y   315
+#define TIME_PANEL_Y   300
 #define TIME_PANEL_W   300
 #define TIME_PANEL_H   74
 
 #define CURVE_LEFT_X      90
 #define CURVE_RIGHT_X     910
-#define CURVE_BASE_Y      375
-#define CURVE_ARCH_H      26
+#define CURVE_BASE_Y      390
+#define CURVE_ARCH_H      -34
 
 #define CURVE2_LEFT_X     150
 #define CURVE2_RIGHT_X    850
-#define CURVE2_BASE_Y     388
-#define CURVE2_ARCH_H     18
+#define CURVE2_BASE_Y     400
+#define CURVE2_ARCH_H     -24
 
-#define CURVE3_LEFT_X     220
-#define CURVE3_RIGHT_X    780
-#define CURVE3_BASE_Y     401
-#define CURVE3_ARCH_H     10
+#define CURVE3_LEFT_X     260
+#define CURVE3_RIGHT_X    740
+#define CURVE3_BASE_Y     410
+#define CURVE3_ARCH_H     -14
+
+#define WIFI_X            865
+#define WIFI_Y            20
+
+static lv_style_t s_curve1_style;
+static lv_style_t s_curve1_glow_style;
+static lv_style_t s_curve2_style;
+static lv_style_t s_curve3_style;
+static bool s_styles_init = false;
 
 static void setup_card(willi_metric_card_t *card,
                        const char *title,
@@ -74,16 +87,18 @@ static void style_time_panel(lv_obj_t *obj)
 {
     lv_obj_set_size(obj, TIME_PANEL_W, TIME_PANEL_H);
     lv_obj_set_style_bg_color(obj, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_bg_opa(obj, OPA_12, 0);
+    lv_obj_set_style_bg_opa(obj, OPA_10, 0);
 
     lv_obj_set_style_border_width(obj, 1, 0);
     lv_obj_set_style_border_color(obj, lv_color_hex(C_PANEL_BORDER), 0);
-    lv_obj_set_style_border_opa(obj, OPA_18, 0);
+    lv_obj_set_style_border_opa(obj, OPA_24, 0);
 
-    lv_obj_set_style_radius(obj, 16, 0);
+    lv_obj_set_style_radius(obj, 18, 0);
 
-    lv_obj_set_style_shadow_width(obj, 0, 0);
-    lv_obj_set_style_shadow_opa(obj, LV_OPA_0, 0);
+    lv_obj_set_style_shadow_width(obj, 20, 0);
+    lv_obj_set_style_shadow_spread(obj, 0, 0);
+    lv_obj_set_style_shadow_color(obj, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_shadow_opa(obj, OPA_8, 0);
 
     lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag(obj, LV_OBJ_FLAG_CLICKABLE);
@@ -100,7 +115,7 @@ static int32_t lerp_i32(int32_t a, int32_t b, int32_t t, int32_t den)
     return a + ((b - a) * t) / den;
 }
 
-static void build_quadratic_curve(lv_point_t *pts,
+static void build_quadratic_curve(willi_curve_point_t *pts,
                                   uint16_t count,
                                   lv_coord_t x0, lv_coord_t y0,
                                   lv_coord_t cx, lv_coord_t cy,
@@ -119,9 +134,40 @@ static void build_quadratic_curve(lv_point_t *pts,
         int32_t xb = lerp_i32(cx, x1, t, den);
         int32_t yb = lerp_i32(cy, y1, t, den);
 
-        pts[i].x = (lv_coord_t)lerp_i32(xa, xb, t, den);
-        pts[i].y = (lv_coord_t)lerp_i32(ya, yb, t, den);
+        pts[i].x = lerp_i32(xa, xb, t, den);
+        pts[i].y = lerp_i32(ya, yb, t, den);
     }
+}
+
+static void ensure_curve_styles(void)
+{
+    if(s_styles_init) return;
+
+    lv_style_init(&s_curve1_style);
+    lv_style_set_line_width(&s_curve1_style, 4);
+    lv_style_set_line_color(&s_curve1_style, lv_color_hex(C_GREEN_SOFT));
+    lv_style_set_line_opa(&s_curve1_style, OPA_78);
+    lv_style_set_line_rounded(&s_curve1_style, true);
+
+    lv_style_init(&s_curve1_glow_style);
+    lv_style_set_line_width(&s_curve1_glow_style, 10);
+    lv_style_set_line_color(&s_curve1_glow_style, lv_color_hex(C_GREEN_SOFT));
+    lv_style_set_line_opa(&s_curve1_glow_style, OPA_12);
+    lv_style_set_line_rounded(&s_curve1_glow_style, true);
+
+    lv_style_init(&s_curve2_style);
+    lv_style_set_line_width(&s_curve2_style, 3);
+    lv_style_set_line_color(&s_curve2_style, lv_color_hex(C_BLUE_SOFT));
+    lv_style_set_line_opa(&s_curve2_style, OPA_42);
+    lv_style_set_line_rounded(&s_curve2_style, true);
+
+    lv_style_init(&s_curve3_style);
+    lv_style_set_line_width(&s_curve3_style, 2);
+    lv_style_set_line_color(&s_curve3_style, lv_color_hex(C_GREEN_SOFT));
+    lv_style_set_line_opa(&s_curve3_style, OPA_16);
+    lv_style_set_line_rounded(&s_curve3_style, true);
+
+    s_styles_init = true;
 }
 
 static void style_travel_dot(lv_obj_t *obj, lv_color_t color, lv_coord_t size, lv_opa_t opa)
@@ -132,7 +178,7 @@ static void style_travel_dot(lv_obj_t *obj, lv_color_t color, lv_coord_t size, l
     lv_obj_set_style_bg_opa(obj, opa, 0);
     lv_obj_set_style_border_width(obj, 0, 0);
 
-    lv_obj_set_style_shadow_width(obj, 26, 0);
+    lv_obj_set_style_shadow_width(obj, 24, 0);
     lv_obj_set_style_shadow_spread(obj, 2, 0);
     lv_obj_set_style_shadow_color(obj, color, 0);
     lv_obj_set_style_shadow_opa(obj, opa, 0);
@@ -141,76 +187,81 @@ static void style_travel_dot(lv_obj_t *obj, lv_color_t color, lv_coord_t size, l
     lv_obj_clear_flag(obj, LV_OBJ_FLAG_CLICKABLE);
 }
 
-static void style_curve_seg(lv_obj_t *obj, lv_color_t color, lv_opa_t opa, lv_coord_t thickness, lv_coord_t w)
+static void style_dot_halo(lv_obj_t *obj, lv_color_t color, lv_coord_t size, lv_opa_t opa)
 {
-    lv_obj_remove_style_all(obj);
-    lv_obj_set_size(obj, w, thickness);
+    lv_obj_set_size(obj, size, size);
+    lv_obj_set_style_radius(obj, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(obj, color, 0);
     lv_obj_set_style_bg_opa(obj, opa, 0);
-    lv_obj_set_style_radius(obj, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_border_width(obj, 0, 0);
-
-    lv_obj_set_style_shadow_width(obj, thickness * 4, 0);
-    lv_obj_set_style_shadow_spread(obj, 1, 0);
-    lv_obj_set_style_shadow_color(obj, color, 0);
-    lv_obj_set_style_shadow_opa(obj, opa, 0);
+    lv_obj_set_style_shadow_width(obj, 0, 0);
 
     lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag(obj, LV_OBJ_FLAG_CLICKABLE);
 }
 
-static lv_coord_t abs_i(lv_coord_t v)
+static lv_point_t interp_curve_point(const willi_curve_point_t *pts, uint16_t count, float pos)
 {
-    return (v < 0) ? -v : v;
+    lv_point_t out = {0, 0};
+    if(!pts || count < 2) return out;
+
+    float max_pos = (float)(count - 1);
+
+    while(pos >= max_pos) pos -= max_pos;
+    while(pos < 0.0f) pos += max_pos;
+
+    {
+        int idx = (int)pos;
+        float frac = pos - (float)idx;
+        int next = idx + 1;
+        if(next >= count) next = 0;
+
+        out.x = (lv_coord_t)((float)pts[idx].x + ((float)pts[next].x - (float)pts[idx].x) * frac);
+        out.y = (lv_coord_t)((float)pts[idx].y + ((float)pts[next].y - (float)pts[idx].y) * frac);
+    }
+
+    return out;
 }
 
-static void build_curve_segments(lv_obj_t *parent,
-                                 lv_obj_t **segs,
-                                 const lv_point_t *pts,
-                                 uint16_t count,
-                                 lv_color_t color,
-                                 lv_opa_t opa,
-                                 lv_coord_t thickness)
+static void set_hidden(lv_obj_t *obj, bool hidden)
 {
-    if(!parent || !segs || !pts || count < 2) return;
+    if(!obj) return;
 
-    for(uint16_t i = 0; i < count - 1; i++) {
-        lv_coord_t x1 = pts[i].x;
-        lv_coord_t y1 = pts[i].y;
-        lv_coord_t x2 = pts[i + 1].x;
-        lv_coord_t y2 = pts[i + 1].y;
-
-        lv_coord_t seg_w = abs_i(x2 - x1);
-        if(seg_w < 8) seg_w = 8;
-
-        lv_coord_t seg_h = thickness;
-        lv_coord_t px = (x1 < x2) ? x1 : x2;
-        lv_coord_t py = (y1 + y2) / 2 - seg_h / 2;
-
-        segs[i] = lv_obj_create(parent);
-        style_curve_seg(segs[i], color, opa, thickness, seg_w + 2);
-        lv_obj_set_pos(segs[i], px, py);
-    }
+    if(hidden) lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
 }
 
-static void set_curve_segments_hidden(lv_obj_t **segs, bool hidden)
+static void place_dot_pair(lv_obj_t *halo, lv_obj_t *dot, lv_point_t p, lv_coord_t halo_r, lv_coord_t dot_r)
 {
-    if(!segs) return;
-
-    for(uint16_t i = 0; i < WILLI_CURVE_SEGS; i++) {
-        if(!segs[i]) continue;
-        if(hidden) lv_obj_add_flag(segs[i], LV_OBJ_FLAG_HIDDEN);
-        else lv_obj_clear_flag(segs[i], LV_OBJ_FLAG_HIDDEN);
-    }
+    if(halo) lv_obj_set_pos(halo, p.x - halo_r, p.y - halo_r);
+    if(dot)  lv_obj_set_pos(dot,  p.x - dot_r,  p.y - dot_r);
 }
 
-static void move_curve_segments_foreground(lv_obj_t **segs)
+static void wifi_apply_phase(willi_training_metrics_t *m)
 {
-    if(!segs) return;
+    lv_opa_t opa = OPA_36;
 
-    for(uint16_t i = 0; i < WILLI_CURVE_SEGS; i++) {
-        if(segs[i]) lv_obj_move_foreground(segs[i]);
+    if(!m || !m->wifi_label) return;
+
+    switch(m->wifi_phase) {
+        case 0: opa = OPA_28; break;
+        case 1: opa = OPA_44; break;
+        case 2: opa = OPA_60; break;
+        case 3: opa = OPA_90; break;
+        case 4: opa = OPA_60; break;
+        default: opa = OPA_40; break;
     }
+
+    lv_obj_set_style_text_opa(m->wifi_label, opa, 0);
+}
+
+static void wifi_timer_cb(lv_timer_t *t)
+{
+    willi_training_metrics_t *m = (willi_training_metrics_t *)t->user_data;
+    if(!m) return;
+
+    m->wifi_phase = (m->wifi_phase + 1) % 6;
+    wifi_apply_phase(m);
 }
 
 static void curve_timer_cb(lv_timer_t *t)
@@ -218,35 +269,64 @@ static void curve_timer_cb(lv_timer_t *t)
     willi_training_metrics_t *m = (willi_training_metrics_t *)t->user_data;
     if(!m) return;
 
-    m->dot_idx_1 = (m->dot_idx_1 + 1) % WILLI_CURVE_PTS;
-    m->dot_idx_2 = (m->dot_idx_2 + 1) % WILLI_CURVE_PTS;
+    m->dot_pos_1 += 0.34f;
+    m->dot_pos_2 += 0.22f;
 
-    if(m->travel_dot_1) {
-        lv_point_t p = m->curve1_pts[m->dot_idx_1];
-        lv_obj_set_pos(m->travel_dot_1, p.x - 4, p.y - 4);
-    }
+    {
+        lv_point_t p1 = interp_curve_point(m->curve1_pts, WILLI_CURVE_PTS, m->dot_pos_1);
+        lv_point_t p2 = interp_curve_point(m->curve2_pts, WILLI_CURVE_PTS, m->dot_pos_2);
 
-    if(m->travel_dot_2) {
-        lv_point_t p = m->curve2_pts[m->dot_idx_2];
-        lv_obj_set_pos(m->travel_dot_2, p.x - 3, p.y - 3);
+        place_dot_pair(m->travel_dot_1_halo, m->travel_dot_1, p1, 8, 4);
+        place_dot_pair(m->travel_dot_2_halo, m->travel_dot_2, p2, 6, 3);
     }
+}
+
+static void create_wifi_icon(lv_obj_t *parent, willi_training_metrics_t *m)
+{
+    m->wifi_label = lv_label_create(parent);
+    lv_label_set_text(m->wifi_label, LV_SYMBOL_WIFI);
+    lv_obj_set_style_text_font(m->wifi_label, &lv_font_montserrat_22, 0);
+    lv_obj_set_style_text_color(m->wifi_label, lv_color_hex(C_WIFI), 0);
+    lv_obj_set_style_text_opa(m->wifi_label, OPA_60, 0);
+    lv_obj_set_pos(m->wifi_label, WIFI_X, WIFI_Y);
+    lv_obj_clear_flag(m->wifi_label, LV_OBJ_FLAG_CLICKABLE);
+
+    m->wifi_phase = 0;
+    wifi_apply_phase(m);
+}
+
+static void setup_line_object(lv_obj_t *line, lv_obj_t *parent)
+{
+    lv_coord_t w;
+    lv_coord_t h;
+
+    if(!line || !parent) return;
+
+    w = lv_obj_get_width(parent);
+    h = lv_obj_get_height(parent);
+
+    if(w <= 0) w = 1024;
+    if(h <= 0) h = 600;
+
+    lv_obj_set_pos(line, 0, 0);
+    lv_obj_set_size(line, w, h);
+
+    lv_obj_clear_flag(line, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(line, LV_OBJ_FLAG_CLICKABLE);
 }
 
 void willi_training_metrics_create(lv_obj_t *parent, willi_training_metrics_t *m)
 {
-    if(!m) return;
+    if(!parent || !m) return;
 
-    for(uint16_t i = 0; i < WILLI_CURVE_SEGS; i++) {
-        m->curve_1_segs[i] = NULL;
-        m->curve_2_segs[i] = NULL;
-        m->curve_3_segs[i] = NULL;
-    }
+    ensure_curve_styles();
 
     m->curve_timer = NULL;
-    m->dot_idx_1 = 4;
-    m->dot_idx_2 = 24;
+    m->wifi_timer = NULL;
+    m->dot_pos_1 = 4.0f;
+    m->dot_pos_2 = 24.0f;
+    m->wifi_phase = 0;
 
-    /* cards superiores */
     willi_metric_card_create(&m->speed, parent);
     place_top_card(&m->speed, CARD_1_X, TOP_Y);
     setup_card(&m->speed, "VELOCIDAD", "8.5", "km/h", C_GREEN);
@@ -263,14 +343,13 @@ void willi_training_metrics_create(lv_obj_t *parent, willi_training_metrics_t *m
     place_top_card(&m->calories, CARD_4_X, TOP_Y);
     setup_card(&m->calories, "CALORÍAS", "174", "kcal", C_ORANGE);
 
-    /* tiempo abajo */
     willi_metric_card_create(&m->time, parent);
     willi_metric_card_set_pos(&m->time, TIME_PANEL_X, TIME_PANEL_Y);
     willi_metric_card_set_size(&m->time, TIME_PANEL_W, TIME_PANEL_H);
     setup_card(&m->time, "", "00:18:33", "", C_WHITE);
 
     if(m->time.label_title) lv_obj_add_flag(m->time.label_title, LV_OBJ_FLAG_HIDDEN);
-    if(m->time.label_unit)  lv_obj_add_flag(m->time.label_unit,  LV_OBJ_FLAG_HIDDEN);
+    if(m->time.label_unit)  lv_obj_add_flag(m->time.label_unit, LV_OBJ_FLAG_HIDDEN);
 
     if(m->time.label_value) {
         lv_obj_set_width(m->time.label_value, LV_PCT(100));
@@ -284,7 +363,6 @@ void willi_training_metrics_create(lv_obj_t *parent, willi_training_metrics_t *m
     style_time_panel(m->time_panel);
     lv_obj_set_pos(m->time_panel, TIME_PANEL_X, TIME_PANEL_Y);
 
-    /* separadores */
     m->sep_1 = lv_obj_create(parent);
     style_separator(m->sep_1);
     lv_obj_set_pos(m->sep_1, SEP_1_X, SEP_Y);
@@ -297,7 +375,6 @@ void willi_training_metrics_create(lv_obj_t *parent, willi_training_metrics_t *m
     style_separator(m->sep_3);
     lv_obj_set_pos(m->sep_3, SEP_3_X, SEP_Y);
 
-    /* curvas */
     build_quadratic_curve(
         m->curve1_pts, WILLI_CURVE_PTS,
         CURVE_LEFT_X, CURVE_BASE_Y,
@@ -319,27 +396,59 @@ void willi_training_metrics_create(lv_obj_t *parent, willi_training_metrics_t *m
         CURVE3_RIGHT_X, CURVE3_BASE_Y
     );
 
-    build_curve_segments(parent, m->curve_1_segs, m->curve1_pts, WILLI_CURVE_PTS, lv_color_hex(0x5CFF72), OPA_70, 4);
-    build_curve_segments(parent, m->curve_2_segs, m->curve2_pts, WILLI_CURVE_PTS, lv_color_hex(0x37D8FF), OPA_48, 3);
-    build_curve_segments(parent, m->curve_3_segs, m->curve3_pts, WILLI_CURVE_PTS, lv_color_hex(0x5CFF72), OPA_20, 2);
+    m->curve_1_glow = lv_line_create(parent);
+    setup_line_object(m->curve_1_glow, parent);
+    lv_line_set_points(m->curve_1_glow, m->curve1_pts, WILLI_CURVE_PTS);
+    lv_obj_add_style(m->curve_1_glow, &s_curve1_glow_style, LV_PART_MAIN);
 
-    /* dots viajeros */
+    m->curve_1 = lv_line_create(parent);
+    setup_line_object(m->curve_1, parent);
+    lv_line_set_points(m->curve_1, m->curve1_pts, WILLI_CURVE_PTS);
+    lv_obj_add_style(m->curve_1, &s_curve1_style, LV_PART_MAIN);
+
+    m->curve_2 = lv_line_create(parent);
+    setup_line_object(m->curve_2, parent);
+    lv_line_set_points(m->curve_2, m->curve2_pts, WILLI_CURVE_PTS);
+    lv_obj_add_style(m->curve_2, &s_curve2_style, LV_PART_MAIN);
+
+    m->curve_3 = lv_line_create(parent);
+    setup_line_object(m->curve_3, parent);
+    lv_line_set_points(m->curve_3, m->curve3_pts, WILLI_CURVE_PTS);
+    lv_obj_add_style(m->curve_3, &s_curve3_style, LV_PART_MAIN);
+
+    m->travel_dot_1_halo = lv_obj_create(parent);
+    style_dot_halo(m->travel_dot_1_halo, lv_color_hex(C_GREEN_SOFT), 16, OPA_20);
+
     m->travel_dot_1 = lv_obj_create(parent);
     style_travel_dot(m->travel_dot_1, lv_color_hex(0x7CFF6B), 8, OPA_90);
 
+    m->travel_dot_2_halo = lv_obj_create(parent);
+    style_dot_halo(m->travel_dot_2_halo, lv_color_hex(C_BLUE_SOFT), 12, OPA_18);
+
     m->travel_dot_2 = lv_obj_create(parent);
-    style_travel_dot(m->travel_dot_2, lv_color_hex(0x37D8FF), 6, OPA_78);
+    style_travel_dot(m->travel_dot_2, lv_color_hex(C_BLUE_SOFT), 6, OPA_78);
 
-    lv_obj_set_pos(m->travel_dot_1, m->curve1_pts[m->dot_idx_1].x - 4, m->curve1_pts[m->dot_idx_1].y - 4);
-    lv_obj_set_pos(m->travel_dot_2, m->curve2_pts[m->dot_idx_2].x - 3, m->curve2_pts[m->dot_idx_2].y - 3);
+    {
+        lv_point_t p1 = interp_curve_point(m->curve1_pts, WILLI_CURVE_PTS, m->dot_pos_1);
+        lv_point_t p2 = interp_curve_point(m->curve2_pts, WILLI_CURVE_PTS, m->dot_pos_2);
 
-    move_curve_segments_foreground(m->curve_1_segs);
-    move_curve_segments_foreground(m->curve_2_segs);
-    move_curve_segments_foreground(m->curve_3_segs);
+        place_dot_pair(m->travel_dot_1_halo, m->travel_dot_1, p1, 8, 4);
+        place_dot_pair(m->travel_dot_2_halo, m->travel_dot_2, p2, 6, 3);
+    }
+
+    create_wifi_icon(parent, m);
+
+    lv_obj_move_foreground(m->curve_3);
+    lv_obj_move_foreground(m->curve_2);
+    lv_obj_move_foreground(m->curve_1_glow);
+    lv_obj_move_foreground(m->curve_1);
+    lv_obj_move_foreground(m->travel_dot_1_halo);
+    lv_obj_move_foreground(m->travel_dot_2_halo);
     lv_obj_move_foreground(m->travel_dot_1);
     lv_obj_move_foreground(m->travel_dot_2);
     lv_obj_move_foreground(m->time_panel);
     lv_obj_move_foreground(m->time.root);
+    lv_obj_move_foreground(m->wifi_label);
 }
 
 void willi_training_metrics_hide_all(willi_training_metrics_t *m)
@@ -352,22 +461,31 @@ void willi_training_metrics_hide_all(willi_training_metrics_t *m)
     willi_metric_card_hide(&m->calories);
     willi_metric_card_hide(&m->time);
 
-    if(m->sep_1) lv_obj_add_flag(m->sep_1, LV_OBJ_FLAG_HIDDEN);
-    if(m->sep_2) lv_obj_add_flag(m->sep_2, LV_OBJ_FLAG_HIDDEN);
-    if(m->sep_3) lv_obj_add_flag(m->sep_3, LV_OBJ_FLAG_HIDDEN);
+    set_hidden(m->sep_1, true);
+    set_hidden(m->sep_2, true);
+    set_hidden(m->sep_3, true);
+    set_hidden(m->time_panel, true);
 
-    if(m->time_panel) lv_obj_add_flag(m->time_panel, LV_OBJ_FLAG_HIDDEN);
+    set_hidden(m->curve_1_glow, true);
+    set_hidden(m->curve_1, true);
+    set_hidden(m->curve_2, true);
+    set_hidden(m->curve_3, true);
 
-    set_curve_segments_hidden(m->curve_1_segs, true);
-    set_curve_segments_hidden(m->curve_2_segs, true);
-    set_curve_segments_hidden(m->curve_3_segs, true);
+    set_hidden(m->travel_dot_1_halo, true);
+    set_hidden(m->travel_dot_1, true);
+    set_hidden(m->travel_dot_2_halo, true);
+    set_hidden(m->travel_dot_2, true);
 
-    if(m->travel_dot_1) lv_obj_add_flag(m->travel_dot_1, LV_OBJ_FLAG_HIDDEN);
-    if(m->travel_dot_2) lv_obj_add_flag(m->travel_dot_2, LV_OBJ_FLAG_HIDDEN);
+    set_hidden(m->wifi_label, true);
 
     if(m->curve_timer) {
         lv_timer_del(m->curve_timer);
         m->curve_timer = NULL;
+    }
+
+    if(m->wifi_timer) {
+        lv_timer_del(m->wifi_timer);
+        m->wifi_timer = NULL;
     }
 }
 
@@ -375,18 +493,22 @@ void willi_training_metrics_show_animated(willi_training_metrics_t *m)
 {
     if(!m) return;
 
-    if(m->sep_1) lv_obj_clear_flag(m->sep_1, LV_OBJ_FLAG_HIDDEN);
-    if(m->sep_2) lv_obj_clear_flag(m->sep_2, LV_OBJ_FLAG_HIDDEN);
-    if(m->sep_3) lv_obj_clear_flag(m->sep_3, LV_OBJ_FLAG_HIDDEN);
+    set_hidden(m->sep_1, false);
+    set_hidden(m->sep_2, false);
+    set_hidden(m->sep_3, false);
+    set_hidden(m->time_panel, false);
 
-    if(m->time_panel) lv_obj_clear_flag(m->time_panel, LV_OBJ_FLAG_HIDDEN);
+    set_hidden(m->curve_1_glow, false);
+    set_hidden(m->curve_1, false);
+    set_hidden(m->curve_2, false);
+    set_hidden(m->curve_3, false);
 
-    set_curve_segments_hidden(m->curve_1_segs, false);
-    set_curve_segments_hidden(m->curve_2_segs, false);
-    set_curve_segments_hidden(m->curve_3_segs, false);
+    set_hidden(m->travel_dot_1_halo, false);
+    set_hidden(m->travel_dot_1, false);
+    set_hidden(m->travel_dot_2_halo, false);
+    set_hidden(m->travel_dot_2, false);
 
-    if(m->travel_dot_1) lv_obj_clear_flag(m->travel_dot_1, LV_OBJ_FLAG_HIDDEN);
-    if(m->travel_dot_2) lv_obj_clear_flag(m->travel_dot_2, LV_OBJ_FLAG_HIDDEN);
+    set_hidden(m->wifi_label, false);
 
     willi_metric_card_prepare_in_anim(&m->speed, 24);
     willi_metric_card_prepare_in_anim(&m->pace, 24);
@@ -400,17 +522,24 @@ void willi_training_metrics_show_animated(willi_training_metrics_t *m)
     willi_metric_card_animate_in(&m->calories, 210);
     willi_metric_card_animate_in(&m->time, 260);
 
-    move_curve_segments_foreground(m->curve_1_segs);
-    move_curve_segments_foreground(m->curve_2_segs);
-    move_curve_segments_foreground(m->curve_3_segs);
-
-    if(m->travel_dot_1) lv_obj_move_foreground(m->travel_dot_1);
-    if(m->travel_dot_2) lv_obj_move_foreground(m->travel_dot_2);
-    if(m->time_panel)   lv_obj_move_foreground(m->time_panel);
-    if(m->time.root)    lv_obj_move_foreground(m->time.root);
+    lv_obj_move_foreground(m->curve_3);
+    lv_obj_move_foreground(m->curve_2);
+    lv_obj_move_foreground(m->curve_1_glow);
+    lv_obj_move_foreground(m->curve_1);
+    lv_obj_move_foreground(m->travel_dot_1_halo);
+    lv_obj_move_foreground(m->travel_dot_2_halo);
+    lv_obj_move_foreground(m->travel_dot_1);
+    lv_obj_move_foreground(m->travel_dot_2);
+    lv_obj_move_foreground(m->time_panel);
+    lv_obj_move_foreground(m->time.root);
+    lv_obj_move_foreground(m->wifi_label);
 
     if(!m->curve_timer) {
-        m->curve_timer = lv_timer_create(curve_timer_cb, 35, m);
+        m->curve_timer = lv_timer_create(curve_timer_cb, 22, m);
+    }
+
+    if(!m->wifi_timer) {
+        m->wifi_timer = lv_timer_create(wifi_timer_cb, 180, m);
     }
 }
 
@@ -435,16 +564,25 @@ void willi_training_metrics_hide_animated(willi_training_metrics_t *m)
         m->curve_timer = NULL;
     }
 
-    if(m->sep_1) lv_obj_add_flag(m->sep_1, LV_OBJ_FLAG_HIDDEN);
-    if(m->sep_2) lv_obj_add_flag(m->sep_2, LV_OBJ_FLAG_HIDDEN);
-    if(m->sep_3) lv_obj_add_flag(m->sep_3, LV_OBJ_FLAG_HIDDEN);
+    if(m->wifi_timer) {
+        lv_timer_del(m->wifi_timer);
+        m->wifi_timer = NULL;
+    }
 
-    if(m->time_panel) lv_obj_add_flag(m->time_panel, LV_OBJ_FLAG_HIDDEN);
+    set_hidden(m->sep_1, true);
+    set_hidden(m->sep_2, true);
+    set_hidden(m->sep_3, true);
+    set_hidden(m->time_panel, true);
 
-    set_curve_segments_hidden(m->curve_1_segs, true);
-    set_curve_segments_hidden(m->curve_2_segs, true);
-    set_curve_segments_hidden(m->curve_3_segs, true);
+    set_hidden(m->curve_1_glow, true);
+    set_hidden(m->curve_1, true);
+    set_hidden(m->curve_2, true);
+    set_hidden(m->curve_3, true);
 
-    if(m->travel_dot_1) lv_obj_add_flag(m->travel_dot_1, LV_OBJ_FLAG_HIDDEN);
-    if(m->travel_dot_2) lv_obj_add_flag(m->travel_dot_2, LV_OBJ_FLAG_HIDDEN);
+    set_hidden(m->travel_dot_1_halo, true);
+    set_hidden(m->travel_dot_1, true);
+    set_hidden(m->travel_dot_2_halo, true);
+    set_hidden(m->travel_dot_2, true);
+
+    set_hidden(m->wifi_label, true);
 }
