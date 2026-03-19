@@ -11,7 +11,7 @@
 static void style_root(lv_obj_t *obj)
 {
     lv_obj_remove_style_all(obj);
-    lv_obj_set_size(obj, 240, 64);
+    lv_obj_set_size(obj, 250, 68);
     lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(obj, LV_OBJ_FLAG_CLICKABLE);
 
@@ -43,8 +43,8 @@ static void style_face(lv_obj_t *obj)
     lv_obj_set_style_border_width(obj, 0, 0);
 
     lv_obj_set_style_transform_zoom(obj, 256, 0);
-    lv_obj_set_style_transform_pivot_x(obj, 115, 0);
-    lv_obj_set_style_transform_pivot_y(obj, 30, 0);
+    lv_obj_set_style_transform_pivot_x(obj, 125, 0);
+    lv_obj_set_style_transform_pivot_y(obj, 34, 0);
 }
 
 static void press_y_cb(void *var, int32_t v)
@@ -55,6 +55,16 @@ static void press_y_cb(void *var, int32_t v)
 static void press_zoom_cb(void *var, int32_t v)
 {
     lv_obj_set_style_transform_zoom((lv_obj_t *)var, (lv_coord_t)v, 0);
+}
+
+static void shadow_width_cb(void *var, int32_t v)
+{
+    lv_obj_set_style_shadow_width((lv_obj_t *)var, (lv_coord_t)v, 0);
+}
+
+static void shadow_opa_cb(void *var, int32_t v)
+{
+    lv_obj_set_style_shadow_opa((lv_obj_t *)var, (lv_opa_t)v, 0);
 }
 
 static void event_cb(lv_event_t *e)
@@ -94,13 +104,13 @@ willi_stop_btn_t *willi_stop_btn_create(lv_obj_t *parent)
     lv_obj_set_style_shadow_color(btn->icon_box, lv_color_hex(STOP_RED), 0);
     lv_obj_set_style_shadow_width(btn->icon_box, 8, 0);
     lv_obj_set_style_shadow_opa(btn->icon_box, LV_OPA_30, 0);
-    lv_obj_align(btn->icon_box, LV_ALIGN_CENTER, -50, 0);
+    lv_obj_align(btn->icon_box, LV_ALIGN_CENTER, -68, 0);
 
     btn->label = lv_label_create(btn->face);
     lv_label_set_text(btn->label, "DETENER");
     lv_obj_set_style_text_color(btn->label, lv_color_hex(STOP_TEXT), 0);
     lv_obj_set_style_text_font(btn->label, &lv_font_montserrat_26, 0);
-    lv_obj_align(btn->label, LV_ALIGN_CENTER, 20, 0);
+    lv_obj_align(btn->label, LV_ALIGN_CENTER, 26, 0);
 
     lv_obj_add_event_cb(btn->root, event_cb, LV_EVENT_ALL, btn);
     return btn;
@@ -120,40 +130,74 @@ void willi_stop_btn_set_pressed(willi_stop_btn_t *btn, bool pressed)
 
     lv_anim_del(btn->face, press_y_cb);
     lv_anim_del(btn->face, press_zoom_cb);
+    lv_anim_del(btn->root, shadow_width_cb);
+    lv_anim_del(btn->root, shadow_opa_cb);
 
     lv_anim_t a;
 
     if(pressed) {
         lv_anim_init(&a);
         lv_anim_set_var(&a, btn->face);
-        lv_anim_set_values(&a, 0, 3);
-        lv_anim_set_time(&a, 80);
+        lv_anim_set_values(&a, 0, 4);
+        lv_anim_set_time(&a, 90);
         lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
         lv_anim_set_exec_cb(&a, press_y_cb);
         lv_anim_start(&a);
 
         lv_anim_init(&a);
         lv_anim_set_var(&a, btn->face);
-        lv_anim_set_values(&a, 256, 248);
-        lv_anim_set_time(&a, 80);
+        lv_anim_set_values(&a, 256, 244);
+        lv_anim_set_time(&a, 90);
         lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
         lv_anim_set_exec_cb(&a, press_zoom_cb);
+        lv_anim_start(&a);
+
+        lv_anim_init(&a);
+        lv_anim_set_var(&a, btn->root);
+        lv_anim_set_values(&a, 12, 6);
+        lv_anim_set_time(&a, 90);
+        lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+        lv_anim_set_exec_cb(&a, shadow_width_cb);
+        lv_anim_start(&a);
+
+        lv_anim_init(&a);
+        lv_anim_set_var(&a, btn->root);
+        lv_anim_set_values(&a, LV_OPA_20, LV_OPA_10);
+        lv_anim_set_time(&a, 90);
+        lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+        lv_anim_set_exec_cb(&a, shadow_opa_cb);
         lv_anim_start(&a);
     } else {
         lv_anim_init(&a);
         lv_anim_set_var(&a, btn->face);
-        lv_anim_set_values(&a, 3, 0);
-        lv_anim_set_time(&a, 140);
+        lv_anim_set_values(&a, 4, 0);
+        lv_anim_set_time(&a, 150);
         lv_anim_set_path_cb(&a, lv_anim_path_overshoot);
         lv_anim_set_exec_cb(&a, press_y_cb);
         lv_anim_start(&a);
 
         lv_anim_init(&a);
         lv_anim_set_var(&a, btn->face);
-        lv_anim_set_values(&a, 248, 256);
-        lv_anim_set_time(&a, 140);
+        lv_anim_set_values(&a, 244, 256);
+        lv_anim_set_time(&a, 150);
         lv_anim_set_path_cb(&a, lv_anim_path_overshoot);
         lv_anim_set_exec_cb(&a, press_zoom_cb);
+        lv_anim_start(&a);
+
+        lv_anim_init(&a);
+        lv_anim_set_var(&a, btn->root);
+        lv_anim_set_values(&a, 6, 12);
+        lv_anim_set_time(&a, 150);
+        lv_anim_set_path_cb(&a, lv_anim_path_overshoot);
+        lv_anim_set_exec_cb(&a, shadow_width_cb);
+        lv_anim_start(&a);
+
+        lv_anim_init(&a);
+        lv_anim_set_var(&a, btn->root);
+        lv_anim_set_values(&a, LV_OPA_10, LV_OPA_20);
+        lv_anim_set_time(&a, 150);
+        lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+        lv_anim_set_exec_cb(&a, shadow_opa_cb);
         lv_anim_start(&a);
     }
 }

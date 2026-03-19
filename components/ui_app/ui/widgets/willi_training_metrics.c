@@ -25,32 +25,31 @@ void willi_training_metrics_create(lv_obj_t *parent, willi_training_metrics_t *m
     if(!m) return;
 
     willi_metric_card_create(&m->speed, parent);
-    willi_metric_card_set_pos(&m->speed, 70, 108);
-    willi_metric_card_set_size(&m->speed, 130, 130);
+    willi_metric_card_set_pos(&m->speed, 95, 110);
+    willi_metric_card_set_size(&m->speed, 165, 130);
     setup_card(&m->speed, "VELOCIDAD", "8.5", "km/h", C_GREEN);
 
     willi_metric_card_create(&m->pace, parent);
-    willi_metric_card_set_pos(&m->pace, 240, 108);
-    willi_metric_card_set_size(&m->pace, 130, 130);
+    willi_metric_card_set_pos(&m->pace, 265, 110);
+    willi_metric_card_set_size(&m->pace, 150, 130);
     setup_card(&m->pace, "RITMO", "07:03", "min/km", C_BLUE);
 
     willi_metric_card_create(&m->distance, parent);
-    willi_metric_card_set_pos(&m->distance, 410, 108);
-    willi_metric_card_set_size(&m->distance, 130, 130);
+    willi_metric_card_set_pos(&m->distance, 440, 110);
+    willi_metric_card_set_size(&m->distance, 150, 130);
     setup_card(&m->distance, "DISTANCIA", "2.54", "km", C_WHITE);
 
     willi_metric_card_create(&m->time, parent);
-    willi_metric_card_set_pos(&m->time, 575, 108);
-    willi_metric_card_set_size(&m->time, 160, 130);
+    willi_metric_card_set_pos(&m->time, 610, 110);
+    willi_metric_card_set_size(&m->time, 185, 130);
     setup_card(&m->time, "TIEMPO", "00:18:33", "", C_WHITE);
 
-    // Para tiempo conviene un font algo menor
     lv_obj_set_style_text_font(m->time.label_value, &lv_font_montserrat_40, 0);
     lv_obj_align(m->time.label_value, LV_ALIGN_TOP_MID, 0, 34);
 
     willi_metric_card_create(&m->calories, parent);
-    willi_metric_card_set_pos(&m->calories, 750, 108);
-    willi_metric_card_set_size(&m->calories, 130, 130);
+    willi_metric_card_set_pos(&m->calories, 795, 110);
+    willi_metric_card_set_size(&m->calories, 150, 130);
     setup_card(&m->calories, "CALORIAS", "174", "kcal", C_ORANGE);
 }
 

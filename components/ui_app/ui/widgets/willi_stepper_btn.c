@@ -41,7 +41,7 @@ static void style_root(willi_stepper_btn_t *btn)
 {
     lv_obj_remove_style_all(btn->root);
 
-    lv_obj_set_size(btn->root, 210, 48);
+    lv_obj_set_size(btn->root, 250, 56);
     lv_obj_clear_flag(btn->root, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_set_style_radius(btn->root, 10, 0);
@@ -70,7 +70,7 @@ static void style_side_zone(lv_obj_t *obj)
     lv_obj_remove_style_all(obj);
 
     lv_obj_set_height(obj, LV_PCT(100));
-    lv_obj_set_width(obj, 48);
+    lv_obj_set_width(obj, 54);
     lv_obj_add_flag(obj, LV_OBJ_FLAG_CLICKABLE);
 
     lv_obj_set_style_bg_opa(obj, LV_OPA_TRANSP, 0);

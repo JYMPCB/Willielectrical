@@ -24,7 +24,7 @@ void willi_metric_card_create(willi_metric_card_t *card, lv_obj_t *parent)
 
     card->label_title = lv_label_create(card->root);
     lv_label_set_text(card->label_title, "TITLE");
-    lv_obj_set_style_text_font(card->label_title, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_font(card->label_title, &lv_font_montserrat_22, 0);
     lv_obj_set_style_text_color(card->label_title, lv_color_hex(0xEAEAEA), 0);
     lv_obj_align(card->label_title, LV_ALIGN_TOP_MID, 0, 0);
 

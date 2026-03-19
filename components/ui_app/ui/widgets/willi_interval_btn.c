@@ -3,7 +3,7 @@
 #include <stdbool.h>
 
 #define WILLI_INTERVAL_BTN_W         250
-#define WILLI_INTERVAL_BTN_H          50
+#define WILLI_INTERVAL_BTN_H          70
 #define WILLI_INTERVAL_BTN_RADIUS      6
 
 #define WILLI_DARK_TOP          0x343946

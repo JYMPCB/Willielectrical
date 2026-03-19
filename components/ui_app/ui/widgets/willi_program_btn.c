@@ -3,7 +3,7 @@
 #include <stdbool.h>
 
 #define WILLI_PROGRAM_BTN_W          240
-#define WILLI_PROGRAM_BTN_H           50
+#define WILLI_PROGRAM_BTN_H           70
 #define WILLI_PROGRAM_BTN_RADIUS       6
 
 #define WILLI_DARK_TOP          0x343946
@@ -145,7 +145,7 @@ lv_obj_t *willi_program_btn_create(lv_obj_t *parent)
     lv_obj_set_style_text_font(icon, &lv_font_montserrat_20, 0);
 
     lv_obj_t *label = lv_label_create(content);
-    lv_label_set_text(label, "PROGRAMAS");
+    lv_label_set_text(label, "PROGRAMADO");
     lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
     lv_obj_set_style_text_color(label, lv_color_hex(WILLI_TEXT_MAIN), 0);
     lv_obj_set_style_text_font(label, &lv_font_montserrat_20, 0);

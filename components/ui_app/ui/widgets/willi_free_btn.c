@@ -3,7 +3,7 @@
 #include <stdbool.h>
 
 #define WILLI_FREE_BTN_W             260
-#define WILLI_FREE_BTN_H              50
+#define WILLI_FREE_BTN_H              70
 #define WILLI_FREE_BTN_RADIUS          6
 
 #define WILLI_GREEN_TOP         0x6FAE1E

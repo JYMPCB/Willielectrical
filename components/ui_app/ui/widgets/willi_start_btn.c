@@ -196,10 +196,10 @@ static lv_color_t mode_soft_color(willi_start_mode_t mode)
 static const char *mode_subtitle_text(willi_start_mode_t mode)
 {
     switch(mode) {
-        case WILLI_START_MODE_PROGRAM:  return "Programas";
-        case WILLI_START_MODE_INTERVAL: return "Entrenamiento intervalado";
+        case WILLI_START_MODE_PROGRAM:  return "Programado";
+        case WILLI_START_MODE_INTERVAL: return "Intervalado";
         case WILLI_START_MODE_FREE:
-        default:                        return "Entrenamiento libre";
+        default:                        return "Libre";
     }
 }
 
