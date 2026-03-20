@@ -1,5 +1,5 @@
 #include "ui_home.h"
-#include "../../assets/images/bg_png.h"
+#include "../../assets/images/img_bg.h"
 #include "../widgets/willi_start_btn.h"
 #include "../widgets/willi_program_btn.h"
 #include "../widgets/willi_free_btn.h"
@@ -34,6 +34,9 @@ static willi_stepper_btn_t *s_btn_pace  = NULL;
 static willi_stop_btn_t    *s_btn_stop  = NULL;
 
 static willi_training_metrics_t s_metrics;
+
+static willi_wifi_status_t s_wifi;
+static lv_obj_t *s_clock_label = NULL;
 
 /* posiciones reales */
 static lv_coord_t s_pos_program_y = 0;
@@ -331,13 +334,13 @@ lv_obj_t *ui_home_create(void)
     lv_obj_set_style_bg_grad_dir(scr, LV_GRAD_DIR_HOR, 0);
 
     lv_obj_t *bg = lv_img_create(scr);
-    lv_img_set_src(bg, &ui_bg_png);
+    lv_img_set_src(bg, &img_bg);
     lv_obj_clear_flag(bg, LV_OBJ_FLAG_CLICKABLE);
 
     lv_coord_t sw = lv_disp_get_hor_res(NULL);
     lv_coord_t sh = lv_disp_get_ver_res(NULL);
-    uint32_t zoom_x = ((uint32_t)sw * 256U) / ui_bg_png.header.w;
-    uint32_t zoom_y = ((uint32_t)sh * 256U) / ui_bg_png.header.h;
+    uint32_t zoom_x = ((uint32_t)sw * 256U) / img_bg.header.w;
+    uint32_t zoom_y = ((uint32_t)sh * 256U) / img_bg.header.h;
     uint32_t zoom = (zoom_x > zoom_y) ? zoom_x : zoom_y;
     if(zoom < 1U) zoom = 1U;
     if(zoom > 4096U) zoom = 4096U;
@@ -351,11 +354,16 @@ lv_obj_t *ui_home_create(void)
     lv_obj_set_style_text_font(title, &lv_font_montserrat_24, 0);
     lv_obj_align(title, LV_ALIGN_TOP_LEFT, 24, 18);
 
-    lv_obj_t *time = lv_label_create(scr);
-    lv_label_set_text(time, "10:45 AM");
-    lv_obj_set_style_text_color(time, lv_color_white(), 0);
-    lv_obj_set_style_text_font(time, &lv_font_montserrat_22, 0);
-    lv_obj_align(time, LV_ALIGN_TOP_RIGHT, -24, 18);
+    willi_wifi_status_create(scr, &s_wifi, 0, 0);
+    willi_wifi_status_start(&s_wifi);
+
+    s_clock_label = lv_label_create(scr);
+    lv_label_set_text(s_clock_label, "10:45 AM");
+    lv_obj_set_style_text_font(s_clock_label, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_color(s_clock_label, lv_color_hex(0xF2F2F2), 0);
+
+    lv_obj_align(s_wifi.label, LV_ALIGN_TOP_RIGHT, -22, 20);
+    lv_obj_align(s_clock_label, LV_ALIGN_TOP_RIGHT, -78, 20);
 
     s_btn_start    = willi_start_btn_create(scr);
     s_btn_program  = willi_program_btn_create(scr);
