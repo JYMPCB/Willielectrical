@@ -1,4 +1,3 @@
-#include "../../../willi_common/include/willi_opacity.h"
 #include "willi_stepper_btn.h"
 #include <stdlib.h>
 
@@ -48,15 +47,15 @@ static void style_root(willi_stepper_btn_t *btn)
     lv_obj_set_style_bg_color(btn->root, lv_color_hex(STEPPER_BG_1), 0);
     lv_obj_set_style_bg_grad_color(btn->root, lv_color_hex(STEPPER_BG_2), 0);
     lv_obj_set_style_bg_grad_dir(btn->root, LV_GRAD_DIR_VER, 0);
-    lv_obj_set_style_bg_opa(btn->root, OPA_80, 0);
+    lv_obj_set_style_bg_opa(btn->root, LV_OPA_80, 0);
 
     lv_obj_set_style_border_width(btn->root, 1, 0);
     lv_obj_set_style_border_color(btn->root, lv_color_hex(STEPPER_BORDER), 0);
-    lv_obj_set_style_border_opa(btn->root, OPA_45, 0);
+    lv_obj_set_style_border_opa(btn->root, LV_OPA_40, 0);
 
     lv_obj_set_style_shadow_color(btn->root, lv_color_black(), 0);
     lv_obj_set_style_shadow_width(btn->root, 10, 0);
-    lv_obj_set_style_shadow_opa(btn->root, OPA_24, 0);
+    lv_obj_set_style_shadow_opa(btn->root, LV_OPA_20, 0);
 
     lv_obj_set_style_pad_all(btn->root, 0, 0);
     lv_obj_set_style_pad_column(btn->root, 0, 0);
@@ -110,7 +109,7 @@ static void refresh_colors(willi_stepper_btn_t *btn)
 
     lv_obj_set_style_shadow_color(btn->center_zone, btn->accent, 0);
     lv_obj_set_style_shadow_width(btn->center_zone, 8, 0);
-    lv_obj_set_style_shadow_opa(btn->center_zone, OPA_16, 0);
+    lv_obj_set_style_shadow_opa(btn->center_zone, LV_OPA_20, 0);
 
     lv_obj_set_style_shadow_color(btn->minus_zone, btn->accent, 0);
     lv_obj_set_style_shadow_color(btn->plus_zone, btn->accent, 0);
@@ -196,7 +195,7 @@ static void apply_zone_pressed_style(willi_stepper_btn_t *btn, lv_obj_t *zone, l
 
         lv_anim_init(&a);
         lv_anim_set_var(&a, zone);
-        lv_anim_set_values(&a, 0, OPA_18);
+        lv_anim_set_values(&a, 0, LV_OPA_20);
         lv_anim_set_time(&a, 80);
         lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
         lv_anim_set_exec_cb(&a, zone_bg_opa_cb);
@@ -212,7 +211,7 @@ static void apply_zone_pressed_style(willi_stepper_btn_t *btn, lv_obj_t *zone, l
 
         lv_anim_init(&a);
         lv_anim_set_var(&a, zone);
-        lv_anim_set_values(&a, 0, OPA_24);
+        lv_anim_set_values(&a, 0, LV_OPA_20);
         lv_anim_set_time(&a, 80);
         lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
         lv_anim_set_exec_cb(&a, zone_shadow_opa_cb);
@@ -228,7 +227,7 @@ static void apply_zone_pressed_style(willi_stepper_btn_t *btn, lv_obj_t *zone, l
 
         lv_anim_init(&a);
         lv_anim_set_var(&a, btn->center_zone);
-        lv_anim_set_values(&a, OPA_16, OPA_10);
+        lv_anim_set_values(&a, LV_OPA_20, LV_OPA_10);
         lv_anim_set_time(&a, 80);
         lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
         lv_anim_set_exec_cb(&a, center_glow_opa_cb);
@@ -244,7 +243,7 @@ static void apply_zone_pressed_style(willi_stepper_btn_t *btn, lv_obj_t *zone, l
 
         lv_anim_init(&a);
         lv_anim_set_var(&a, zone);
-        lv_anim_set_values(&a, OPA_18, 0);
+        lv_anim_set_values(&a, LV_OPA_20, 0);
         lv_anim_set_time(&a, 120);
         lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
         lv_anim_set_exec_cb(&a, zone_bg_opa_cb);
@@ -260,7 +259,7 @@ static void apply_zone_pressed_style(willi_stepper_btn_t *btn, lv_obj_t *zone, l
 
         lv_anim_init(&a);
         lv_anim_set_var(&a, zone);
-        lv_anim_set_values(&a, OPA_24, 0);
+        lv_anim_set_values(&a, LV_OPA_20, 0);
         lv_anim_set_time(&a, 120);
         lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
         lv_anim_set_exec_cb(&a, zone_shadow_opa_cb);
@@ -276,7 +275,7 @@ static void apply_zone_pressed_style(willi_stepper_btn_t *btn, lv_obj_t *zone, l
 
         lv_anim_init(&a);
         lv_anim_set_var(&a, btn->center_zone);
-        lv_anim_set_values(&a, OPA_10, OPA_16);
+        lv_anim_set_values(&a, LV_OPA_10, LV_OPA_20);
         lv_anim_set_time(&a, 120);
         lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
         lv_anim_set_exec_cb(&a, center_glow_opa_cb);

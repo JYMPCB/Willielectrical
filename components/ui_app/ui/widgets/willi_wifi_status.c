@@ -1,4 +1,3 @@
-#include "../../../willi_common/include/willi_opacity.h"
 #include "willi_wifi_status.h"
 #include "lvgl/src/misc/lv_timer_private.h"
 
@@ -13,17 +12,17 @@ static void set_hidden(lv_obj_t *obj, bool hidden)
 
 static void wifi_apply_phase(willi_wifi_status_t *w)
 {
-    lv_opa_t opa = OPA_36;
+    lv_opa_t opa = LV_OPA_40;
 
     if(!w || !w->label) return;
 
     switch(w->phase) {
-        case 0: opa = OPA_28; break;
-        case 1: opa = OPA_44; break;
-        case 2: opa = OPA_60; break;
-        case 3: opa = OPA_90; break;
-        case 4: opa = OPA_60; break;
-        default: opa = OPA_40; break;
+        case 0: opa = LV_OPA_30; break;
+        case 1: opa = LV_OPA_40; break;
+        case 2: opa = LV_OPA_60; break;
+        case 3: opa = LV_OPA_90; break;
+        case 4: opa = LV_OPA_60; break;
+        default: opa = LV_OPA_40; break;
     }
 
     lv_obj_set_style_text_opa(w->label, opa, 0);

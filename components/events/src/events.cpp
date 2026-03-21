@@ -1,8 +1,8 @@
 
 #include <lvgl.h>
 #include "events.h"
-#include "ui_events.h"
-#include "ui.h"
+// #include "ui_events.h" // Eliminado: Squareline
+// #include "ui.h"        // Eliminado: Squareline
 #include "training_interval.h"
 #include "app_globals.h"
 #include "ota_mgr.h"

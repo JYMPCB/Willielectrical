@@ -1,6 +1,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
 #include "board_config.h"
 #include "app.h"
 #include "freertos/FreeRTOS.h"
@@ -26,10 +27,12 @@ extern "C" {
 #if EN_AUDIO
 #include "audio_mgr.h"
 #endif
-//#include "ui_refresh.h"
 #if EN_TASKS
+#include "ui_refresh.h"
 #include "app_globals.h"
-#include "tasks.h"  
+#include "tasks.h"
+#include "app_state.h"
+#include "app_logic.h"
 #endif
 #if EN_WIFI
 #include "wifi_mgr.h"
@@ -46,118 +49,118 @@ extern "C" {
 #include "training_interval.h"
 #endif
 
-void app_init()
+void app_init(void)
 {
-  static const char* TAG = "app";
-  esp_log_level_set("*", ESP_LOG_INFO);
-  esp_log_level_set("wifi", ESP_LOG_VERBOSE);
-  esp_log_level_set("esp_netif", ESP_LOG_VERBOSE);
-  // esp_log_level_set("tcpip_adapter", ESP_LOG_VERBOSE); // <- fuera
+    static const char *TAG = "app";
 
-  #if EN_TASKS
-  g_ui_mutex = xSemaphoreCreateMutex();
-  if (g_ui_mutex == nullptr) {
-    ESP_LOGE(TAG, "xSemaphoreCreateMutex FAILED -> halt");
-    while(1) vTaskDelay(pdMS_TO_TICKS(100));
-  }
-  #endif
+    esp_log_level_set("*", ESP_LOG_INFO);
+    esp_log_level_set("wifi", ESP_LOG_VERBOSE);
+    esp_log_level_set("esp_netif", ESP_LOG_VERBOSE);
 
-  ESP_LOGI(TAG, "Board: %s", BOARD_NAME);
+#if EN_TASKS
+    g_ui_mutex = xSemaphoreCreateMutex();
+    if(g_ui_mutex == nullptr) {
+        ESP_LOGE(TAG, "xSemaphoreCreateMutex FAILED -> halt");
+        while(1) vTaskDelay(pdMS_TO_TICKS(100));
+    }
+#endif
 
-  // Info de chip usando ESP-IDF
-  esp_chip_info_t chip_info;
-  esp_chip_info(&chip_info);
-  uint32_t cpu_freq_mhz = (uint32_t)(esp_clk_cpu_freq() / 1000000);
+    ESP_LOGI(TAG, "Board: %s", BOARD_NAME);
+
+    esp_chip_info_t chip_info;
+    esp_chip_info(&chip_info);
+    uint32_t cpu_freq_mhz = (uint32_t)(esp_clk_cpu_freq() / 1000000);
+
     ESP_LOGI(TAG, "CPU: %d, rev %d, CPU Freq: %d MHz, %d core(s)",
-         chip_info.model, chip_info.revision, cpu_freq_mhz, chip_info.cores);
+             chip_info.model, chip_info.revision, cpu_freq_mhz, chip_info.cores);
     ESP_LOGI(TAG, "Free heap: %d bytes", heap_caps_get_free_size(MALLOC_CAP_DEFAULT));
-#ifdef MALLOC_CAP_SPIRAM
-  ESP_LOGI(TAG, "Free PSRAM size: %d bytes", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
-#endif
-  ESP_LOGI(TAG, "SDK version: %s", esp_get_idf_version());
 
 #ifdef MALLOC_CAP_SPIRAM
-  size_t psram_bytes = heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
-  if (psram_bytes > 0) {
-    ESP_LOGI(TAG, "✅ PSRAM detectada y funcional");
-    char buf[64];
-    snprintf(buf, sizeof(buf), "Tamaño total PSRAM: %u KB", (unsigned)(psram_bytes / 1024));
-    ESP_LOGI(TAG, "%s", buf);
-  } else {
-    ESP_LOGI(TAG, "❌ PSRAM NO detectada");
-  }
-  char buf2[64];
-  snprintf(buf2, sizeof(buf2), "Heap PSRAM libre: %u", (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
-  ESP_LOGI(TAG, "%s", buf2);
+    ESP_LOGI(TAG, "Free PSRAM size: %d bytes", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+#endif
+    ESP_LOGI(TAG, "SDK version: %s", esp_get_idf_version());
+
+#ifdef MALLOC_CAP_SPIRAM
+    size_t psram_bytes = heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
+    if(psram_bytes > 0) {
+        ESP_LOGI(TAG, "PSRAM detectada y funcional");
+        ESP_LOGI(TAG, "Tamaño total PSRAM: %u KB", (unsigned)(psram_bytes / 1024));
+    } else {
+        ESP_LOGI(TAG, "PSRAM NO detectada");
+    }
+    ESP_LOGI(TAG, "Heap PSRAM libre: %u",
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
 #else
-  ESP_LOGI(TAG, "❌ PSRAM NO detectada");
+    ESP_LOGI(TAG, "PSRAM NO detectada");
 #endif
-  char buf3[64];
-  snprintf(buf3, sizeof(buf3), "Heap interno libre: %u", (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT));
-  ESP_LOGI(TAG, "%s", buf3);
 
-  #if EN_DISPLAY
-  if(!display_port_init()){
-    ESP_LOGE(TAG, "display_port_init FAILED -> halt");
-    while(1) vTaskDelay(pdMS_TO_TICKS(100));
-  }
-  #endif
+    ESP_LOGI(TAG, "Heap interno libre: %u",
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT));
 
-  #if EN_AUDIO
-  audio_init();
-  audio_set_volume(95);
-  #endif
-
-  #if EN_TASKS
-  //ui_refresh_start_timer();
-  startTasks();
-  #endif
-
-  #if EN_WIFI
-  wifi_mgr_start_task();
-  #endif
-
-  #if EN_RS485
-  if (handlebar_link_init()) {
-    BaseType_t rc = xTaskCreatePinnedToCore(handlebar_link_task,
-                                            "handlebar",
-                                            4096,
-                                            NULL,
-                                            4,
-                                            NULL,
-                                            0);
-    if (rc != pdPASS) {
-      ESP_LOGE(TAG, "Failed to create handlebar task");
+#if EN_DISPLAY
+    if(!display_port_init()) {
+        ESP_LOGE(TAG, "display_port_init FAILED -> halt");
+        while(1) vTaskDelay(pdMS_TO_TICKS(100));
     }
-  } else {
-    ESP_LOGE(TAG, "handlebar_link_init failed (RS485 disabled)");
-  }
+#endif
 
-  if (vfd_link_init()) {
-    BaseType_t rc = xTaskCreatePinnedToCore(vfd_link_task,
-                                            "vfd",
-                                            4096,
-                                            NULL,
-                                            2,
-                                            NULL,
-                                            0);
-    if (rc != pdPASS) {
-      ESP_LOGE(TAG, "Failed to create vfd task");
+#if EN_AUDIO
+    audio_init();
+    audio_set_volume(95);
+#endif
+
+#if EN_TASKS
+    app_state_init();
+    app_logic_init();
+    ui_refresh_init();
+    ui_refresh_start_timer();
+    startTasks();
+    ESP_LOGI(TAG, "App core + UI refresh initialized");
+#endif
+
+#if EN_WIFI
+    wifi_mgr_start_task();
+#endif
+
+#if EN_RS485
+    if(handlebar_link_init()) {
+        BaseType_t rc = xTaskCreatePinnedToCore(handlebar_link_task,
+                                                "handlebar",
+                                                4096,
+                                                NULL,
+                                                4,
+                                                NULL,
+                                                0);
+        if(rc != pdPASS) {
+            ESP_LOGE(TAG, "Failed to create handlebar task");
+        }
+    } else {
+        ESP_LOGE(TAG, "handlebar_link_init failed (RS485 disabled)");
     }
-  } else {
-    ESP_LOGE(TAG, "vfd_link_init failed (VFD disabled)");
-  }
-  #endif
 
-  
+    if(vfd_link_init()) {
+        BaseType_t rc = xTaskCreatePinnedToCore(vfd_link_task,
+                                                "vfd",
+                                                4096,
+                                                NULL,
+                                                2,
+                                                NULL,
+                                                0);
+        if(rc != pdPASS) {
+            ESP_LOGE(TAG, "Failed to create vfd task");
+        }
+    } else {
+        ESP_LOGE(TAG, "vfd_link_init failed (VFD disabled)");
+    }
+#endif
 
-  #if EN_TI
-  ti_init();
-  #endif
+#if EN_TI
+    ti_init();
+#endif
 
-  #if EN_SERVICES
-  g_service.begin();
-  #endif
+#if EN_SERVICES
+    g_service.begin();
+#endif
 }
 
 #ifdef __cplusplus

@@ -14,7 +14,7 @@ idf_component_register(
     wifi_mgr
     training
     service
-    ui_glue
+
     driver
     esp_driver_i2c
 )

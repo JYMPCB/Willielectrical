@@ -1,4 +1,3 @@
-#include "../../willi_common/include/willi_opacity.h"
 #include "willi_metric_card.h"
 
 static void anim_y_cb(void *var, int32_t v)

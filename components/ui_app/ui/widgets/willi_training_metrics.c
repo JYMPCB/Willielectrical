@@ -1,16 +1,15 @@
-#include "../../../willi_common/include/willi_opacity.h"
-#include "willi_training_metrics.h"
-#include "../../assets/images/img_icon_metric_speed.h"
-#include "../../assets/images/img_icon_metric_pace.h"
-#include "../../assets/images/img_icon_metric_distance.h"
-#include "../../assets/images/img_icon_metric_calories.h"
 
+#include "willi_training_metrics.h"
+#include "../../assets/images/icon_metric_speed.c"
+#include "../../assets/images/icon_metric_pace.c"
+#include "../../assets/images/icon_metric_distance.c"
+#include "../../assets/images/icon_metric_calories.c"
 
 /* assets */
-LV_IMG_DECLARE(img_icon_metric_speed);
-LV_IMG_DECLARE(img_icon_metric_pace);
-LV_IMG_DECLARE(img_icon_metric_distance);
-LV_IMG_DECLARE(img_icon_metric_calories);
+LV_IMAGE_DECLARE(icon_metric_speed);
+LV_IMAGE_DECLARE(icon_metric_pace);
+LV_IMAGE_DECLARE(icon_metric_distance);
+LV_IMAGE_DECLARE(icon_metric_calories);
 
 #define C_TITLE         0xEAEAEA
 #define C_WHITE         0xF2F2F2
@@ -78,7 +77,7 @@ static void style_separator(lv_obj_t *obj)
 {
     lv_obj_set_size(obj, 1, SEP_H);
     lv_obj_set_style_bg_color(obj, lv_color_hex(C_LINE), 0);
-    lv_obj_set_style_bg_opa(obj, OPA_18, 0);
+    lv_obj_set_style_bg_opa(obj, LV_OPA_20, 0);
     lv_obj_set_style_border_width(obj, 0, 0);
     lv_obj_set_style_radius(obj, 0, 0);
     lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
@@ -89,18 +88,18 @@ static void style_time_panel(lv_obj_t *obj)
 {
     lv_obj_set_size(obj, TIME_PANEL_W, TIME_PANEL_H);
     lv_obj_set_style_bg_color(obj, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_bg_opa(obj, OPA_10, 0);
+    lv_obj_set_style_bg_opa(obj, LV_OPA_10, 0);
 
     lv_obj_set_style_border_width(obj, 1, 0);
     lv_obj_set_style_border_color(obj, lv_color_hex(C_PANEL_BORDER), 0);
-    lv_obj_set_style_border_opa(obj, OPA_24, 0);
+    lv_obj_set_style_border_opa(obj, LV_OPA_20, 0);
 
     lv_obj_set_style_radius(obj, 18, 0);
 
     lv_obj_set_style_shadow_width(obj, 24, 0);
     lv_obj_set_style_shadow_spread(obj, 0, 0);
     lv_obj_set_style_shadow_color(obj, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_shadow_opa(obj, OPA_10, 0);
+    lv_obj_set_style_shadow_opa(obj, LV_OPA_10, 0);
 
     lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag(obj, LV_OBJ_FLAG_CLICKABLE);
@@ -110,17 +109,17 @@ static void create_metric_icons(lv_obj_t *parent, willi_training_metrics_t *m)
 {
     if(!parent || !m) return;
 
-    m->icon_speed = lv_img_create(parent);
-    lv_img_set_src(m->icon_speed, &img_icon_metric_speed);
+    m->icon_speed = lv_image_create(parent);
+    lv_image_set_src(m->icon_speed, &icon_metric_speed);
 
-    m->icon_pace = lv_img_create(parent);
-    lv_img_set_src(m->icon_pace, &img_icon_metric_pace);
+    m->icon_pace = lv_image_create(parent);
+    lv_image_set_src(m->icon_pace, &icon_metric_pace);
 
-    m->icon_distance = lv_img_create(parent);
-    lv_img_set_src(m->icon_distance, &img_icon_metric_distance);
+    m->icon_distance = lv_image_create(parent);
+    lv_image_set_src(m->icon_distance, &icon_metric_distance);
 
-    m->icon_calories = lv_img_create(parent);
-    lv_img_set_src(m->icon_calories, &img_icon_metric_calories);
+    m->icon_calories = lv_image_create(parent);
+    lv_image_set_src(m->icon_calories, &icon_metric_calories);
 
     lv_obj_clear_flag(m->icon_speed, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_clear_flag(m->icon_pace, LV_OBJ_FLAG_CLICKABLE);
@@ -190,7 +189,7 @@ void willi_training_metrics_create(lv_obj_t *parent, willi_training_metrics_t *m
     willi_training_fx_create(parent, &m->fx,
                              FX_LEFT_X, FX_RIGHT_X,
                              WAVE_GREEN_BASE_Y, WAVE_GREEN_DEPTH,
-                             WAVE_BLUE_BASE_Y, WAVE_BLUE_DEPTH);    
+                             WAVE_BLUE_BASE_Y, WAVE_BLUE_DEPTH);
 
     lv_obj_move_foreground(m->time_panel);
     lv_obj_move_foreground(m->time.root);
@@ -281,4 +280,40 @@ void willi_training_metrics_hide_animated(willi_training_metrics_t *m)
     set_hidden(m->icon_pace, true);
     set_hidden(m->icon_distance, true);
     set_hidden(m->icon_calories, true);
+}
+
+static void metric_set_value(willi_metric_card_t *card, const char *txt)
+{
+    if(!card) return;
+    willi_metric_card_set_value(card, txt ? txt : "");
+}
+
+void willi_training_metrics_set_speed(willi_training_metrics_t *m, const char *txt)
+{
+    if(!m) return;
+    metric_set_value(&m->speed, txt);
+}
+
+void willi_training_metrics_set_pace(willi_training_metrics_t *m, const char *txt)
+{
+    if(!m) return;
+    metric_set_value(&m->pace, txt);
+}
+
+void willi_training_metrics_set_distance(willi_training_metrics_t *m, const char *txt)
+{
+    if(!m) return;
+    metric_set_value(&m->distance, txt);
+}
+
+void willi_training_metrics_set_calories(willi_training_metrics_t *m, const char *txt)
+{
+    if(!m) return;
+    metric_set_value(&m->calories, txt);
+}
+
+void willi_training_metrics_set_time(willi_training_metrics_t *m, const char *txt)
+{
+    if(!m) return;
+    metric_set_value(&m->time, txt);
 }

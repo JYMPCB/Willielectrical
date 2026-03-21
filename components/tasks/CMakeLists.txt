@@ -10,5 +10,5 @@ idf_component_register(
     willi_common
     app
     display_port
-    ui_glue
+
 )

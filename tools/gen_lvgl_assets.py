@@ -4,9 +4,13 @@ import re
 import subprocess
 import sys
 
+
 # =========================================================
 # CONFIG
 # =========================================================
+# Selector de versión de LVGL: 8 o 9
+LVGL_VERSION = 8  # Cambia a 9 si migrás a LVGL 9
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 SRC_DIR = PROJECT_ROOT / "components" / "ui_app" / "assets" / "src"
@@ -15,8 +19,8 @@ OUT_DIR = PROJECT_ROOT / "components" / "ui_app" / "assets" / "images"
 # Ajustá esta ruta según dónde tengas LVGL dentro del proyecto
 LVGL_IMAGE_PY = PROJECT_ROOT / "lv_port_pc_vscode" / "lvgl" / "scripts" / "LVGLImage.py"
 
-# Formato recomendado para iconos/UI con transparencia
-COLOR_FORMAT = "ARGB8888"
+# Formato recomendado para iconos/UI
+COLOR_FORMAT = "RGB565"
 
 # Si querés usar compresión, cambiar a True
 USE_COMPRESSION = False
@@ -31,15 +35,15 @@ def sanitize_symbol_name(name: str) -> str:
     y SIEMPRE le agrega prefijo img_.
     """
     name = name.lower()
-    name = re.sub(r'[^a-z0-9_]', '_', name)
-    name = re.sub(r'_+', '_', name).strip('_')
+    name = re.sub(r"[^a-z0-9_]", "_", name)
+    name = re.sub(r"_+", "_", name).strip("_")
 
     if not name:
         name = "asset"
 
     return f"img_{name}"
 
-#para usar lvgl8 cambiar lv_image_dsc_t por lv_img_dsc_t
+
 def write_header(h_path: Path, symbol_name: str):
     content = f"""#pragma once
 #include "lvgl.h"
@@ -57,38 +61,130 @@ extern const lv_img_dsc_t {symbol_name};
     h_path.write_text(content, encoding="utf-8")
 
 
+def map_cf_lvgl9_to_lvgl8(cf: str) -> str:
+    """
+    Convierte constantes de formato LVGL 9 a equivalentes razonables en LVGL 8.
+    """
+    cf = cf.strip()
+
+    mapping = {
+        "LV_COLOR_FORMAT_RGB565": "LV_IMG_CF_TRUE_COLOR",
+        "LV_COLOR_FORMAT_RGB565A8": "LV_IMG_CF_TRUE_COLOR_ALPHA",
+        "LV_COLOR_FORMAT_ARGB8888": "LV_IMG_CF_TRUE_COLOR_ALPHA",
+        "LV_COLOR_FORMAT_XRGB8888": "LV_IMG_CF_TRUE_COLOR",
+        "LV_COLOR_FORMAT_A8": "LV_IMG_CF_ALPHA_8BIT",
+        "LV_COLOR_FORMAT_A4": "LV_IMG_CF_ALPHA_4BIT",
+        "LV_COLOR_FORMAT_A2": "LV_IMG_CF_ALPHA_2BIT",
+        "LV_COLOR_FORMAT_A1": "LV_IMG_CF_ALPHA_1BIT",
+        "LV_IMG_CF_TRUE_COLOR": "LV_IMG_CF_TRUE_COLOR",
+        "LV_IMG_CF_TRUE_COLOR_ALPHA": "LV_IMG_CF_TRUE_COLOR_ALPHA",
+        "LV_IMG_CF_ALPHA_1BIT": "LV_IMG_CF_ALPHA_1BIT",
+        "LV_IMG_CF_ALPHA_2BIT": "LV_IMG_CF_ALPHA_2BIT",
+        "LV_IMG_CF_ALPHA_4BIT": "LV_IMG_CF_ALPHA_4BIT",
+        "LV_IMG_CF_ALPHA_8BIT": "LV_IMG_CF_ALPHA_8BIT",
+    }
+
+    return mapping.get(cf, "LV_IMG_CF_TRUE_COLOR")
+
+
+def convert_descriptor_to_lvgl8(txt: str, symbol_name: str) -> str:
+    """
+    Busca el descriptor generado y lo reemplaza por una versión compatible con LVGL 8.
+    Funciona aunque el generador haya emitido estructura estilo LVGL 9.
+    """
+
+    # Busca el bloque:
+    # const lv_img_dsc_t img_xxx = { ... };
+    pattern = re.compile(
+        rf"(const\s+lv_img_dsc_t\s+{re.escape(symbol_name)}\s*=\s*)\{{(.*?)\}};",
+        re.DOTALL
+    )
+
+    match = pattern.search(txt)
+    if not match:
+        return txt
+
+    prefix = match.group(1)
+    body = match.group(2)
+
+    def find_value(patterns, default=None):
+        for p in patterns:
+            m = re.search(p, body, re.DOTALL)
+            if m:
+                return m.group(1).strip()
+        return default
+
+    w = find_value([
+        r"\.header\s*=\s*\{.*?\.w\s*=\s*([0-9]+).*?\}",
+        r"\.header\.w\s*=\s*([0-9]+)",
+        r"\.w\s*=\s*([0-9]+)",
+    ], "0")
+
+    h = find_value([
+        r"\.header\s*=\s*\{.*?\.h\s*=\s*([0-9]+).*?\}",
+        r"\.header\.h\s*=\s*([0-9]+)",
+        r"\.h\s*=\s*([0-9]+)",
+    ], "0")
+
+    cf = find_value([
+        r"\.header\s*=\s*\{.*?\.cf\s*=\s*([A-Za-z0-9_]+).*?\}",
+        r"\.header\.cf\s*=\s*([A-Za-z0-9_]+)",
+        r"\.cf\s*=\s*([A-Za-z0-9_]+)",
+    ], "LV_IMG_CF_TRUE_COLOR")
+
+    data_size = find_value([
+        r"\.data_size\s*=\s*([^,\n]+)"
+    ], "0")
+
+    data = find_value([
+        r"\.data\s*=\s*([^,\n]+)"
+    ], "NULL")
+
+    cf = map_cf_lvgl9_to_lvgl8(cf)
+
+    new_block = f"""{prefix}{{
+    .header.always_zero = 0,
+    .header.w = {w},
+    .header.h = {h},
+    .header.cf = {cf},
+    .data_size = {data_size},
+    .data = {data},
+}};"""
+
+    txt = txt[:match.start()] + new_block + txt[match.end():]
+    return txt
+
+
 def patch_generated_c(c_path: Path, original_base_name: str, symbol_name: str):
     """
     Fuerza el nombre final del descriptor a symbol_name.
-    Ej: bg -> img_bg
     Compatible con LVGL 8 y 9.
     """
     txt = c_path.read_text(encoding="utf-8")
 
     base_escaped = re.escape(original_base_name)
 
-    # Renombrar descriptor principal:
-    # const lv_image_dsc_t bg = {
-    # const lv_img_dsc_t bg = {
+    # Include compatible
+    txt = re.sub(r'#include\s+"lvgl/lvgl.h"', '#include "lvgl.h"', txt)
+
+    # Cambiar tipos LVGL 9 -> LVGL 8/compat
+    txt = re.sub(r"\blv_image_dsc_t\b", "lv_img_dsc_t", txt)
+    txt = re.sub(r"\blv_image_header_t\b", "lv_img_header_t", txt)
+
+    # Renombrar descriptor principal
     txt = re.sub(
-        rf'(\bconst\s+lv_(?:image|img)_dsc_t\s+){base_escaped}(\s*=)',
-        rf'\1{symbol_name}\2',
+        rf"(const\s+lv_img_dsc_t\s+){base_escaped}(\s*=)",
+        rf"\1{symbol_name}\2",
+        txt
+    )
+    txt = re.sub(
+        rf"(extern\s+const\s+lv_img_dsc_t\s+){base_escaped}(\s*;)",
+        rf"\1{symbol_name}\2",
         txt
     )
 
-    # Algunas versiones podrían usar no-const
-    txt = re.sub(
-        rf'(\blv_(?:image|img)_dsc_t\s+){base_escaped}(\s*=)',
-        rf'\1{symbol_name}\2',
-        txt
-    )
-
-    # Por si hubiera extern
-    txt = re.sub(
-        rf'(\bextern\s+const\s+lv_(?:image|img)_dsc_t\s+){base_escaped}(\s*;)',
-        rf'\1{symbol_name}\2',
-        txt
-    )
+    if LVGL_VERSION == 8:
+        txt = convert_descriptor_to_lvgl8(txt, symbol_name)
 
     c_path.write_text(txt, encoding="utf-8")
 
@@ -169,13 +265,13 @@ def write_assets_cmake(asset_symbol_names):
     lines.append("# Archivo autogenerado por gen_lvgl_assets.py")
     lines.append("set(UI_ASSET_SRCS")
     for symbol_name in asset_symbol_names:
-        lines.append(f'    assets/images/{symbol_name}.c')
+        lines.append(f"    assets/images/{symbol_name}.c")
     lines.append(")")
     lines.append("")
 
     lines.append("set(UI_ASSET_HEADERS")
     for symbol_name in asset_symbol_names:
-        lines.append(f'    assets/images/{symbol_name}.h')
+        lines.append(f"    assets/images/{symbol_name}.h")
     lines.append(")")
     lines.append("")
 

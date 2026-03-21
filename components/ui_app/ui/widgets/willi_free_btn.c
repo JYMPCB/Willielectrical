@@ -1,4 +1,3 @@
-#include "../../../willi_common/include/willi_opacity.h"
 #include "willi_free_btn.h"
 #include <stdbool.h>
 
@@ -20,19 +19,19 @@ static void willi_free_btn_init_style_main(lv_style_t *s)
 
     lv_style_set_radius(s, WILLI_FREE_BTN_RADIUS);
 
-    lv_style_set_bg_opa(s, OPA_100);
+    lv_style_set_bg_opa(s, LV_OPA_COVER);
     lv_style_set_bg_color(s, lv_color_hex(WILLI_GREEN_TOP));
     lv_style_set_bg_grad_color(s, lv_color_hex(WILLI_GREEN_BOT));
     lv_style_set_bg_grad_dir(s, LV_GRAD_DIR_HOR);
 
     lv_style_set_border_width(s, 1);
     lv_style_set_border_color(s, lv_color_hex(WILLI_GREEN_EDGE));
-    lv_style_set_border_opa(s, OPA_65);
+    lv_style_set_border_opa(s, LV_OPA_60);
 
     lv_style_set_shadow_width(s, 14);
     lv_style_set_shadow_spread(s, 1);
     lv_style_set_shadow_color(s, lv_color_hex(WILLI_GREEN_SHADOW));
-    lv_style_set_shadow_opa(s, OPA_18);
+    lv_style_set_shadow_opa(s, LV_OPA_20);
     lv_style_set_shadow_ofs_x(s, 0);
     lv_style_set_shadow_ofs_y(s, 0);
 
@@ -43,18 +42,18 @@ static void willi_free_btn_init_style_pressed(lv_style_t *s)
 {
     lv_style_init(s);
 
-    lv_style_set_bg_opa(s, OPA_100);
+    lv_style_set_bg_opa(s, LV_OPA_COVER);
     lv_style_set_bg_color(s, lv_color_hex(0x84CF24));
     lv_style_set_bg_grad_color(s, lv_color_hex(0x2E4B09));
     lv_style_set_bg_grad_dir(s, LV_GRAD_DIR_HOR);
 
     lv_style_set_border_color(s, lv_color_hex(0xD2FF8A));
-    lv_style_set_border_opa(s, OPA_80);
+    lv_style_set_border_opa(s, LV_OPA_80);
 
     lv_style_set_shadow_width(s, 18);
     lv_style_set_shadow_spread(s, 2);
     lv_style_set_shadow_color(s, lv_color_hex(0x90FF27));
-    lv_style_set_shadow_opa(s, OPA_24);
+    lv_style_set_shadow_opa(s, LV_OPA_20);
 
     lv_style_set_translate_y(s, 1);
 }
@@ -63,25 +62,25 @@ static void willi_free_btn_init_style_checked(lv_style_t *s)
 {
     lv_style_init(s);
 
-    lv_style_set_bg_opa(s, OPA_100);
+    lv_style_set_bg_opa(s, LV_OPA_COVER);
     lv_style_set_bg_color(s, lv_color_hex(0x83CC22));
     lv_style_set_bg_grad_color(s, lv_color_hex(0x243C07));
     lv_style_set_bg_grad_dir(s, LV_GRAD_DIR_HOR);
 
     lv_style_set_border_width(s, 1);
     lv_style_set_border_color(s, lv_color_hex(0xC9FF72));
-    lv_style_set_border_opa(s, OPA_85);
+    lv_style_set_border_opa(s, LV_OPA_90);
 
     lv_style_set_shadow_width(s, 20);
     lv_style_set_shadow_spread(s, 2);
     lv_style_set_shadow_color(s, lv_color_hex(0x8CFF24));
-    lv_style_set_shadow_opa(s, OPA_28);
+    lv_style_set_shadow_opa(s, LV_OPA_30);
 }
 
 static void willi_free_btn_init_style_topline(lv_style_t *s)
 {
     lv_style_init(s);
-    lv_style_set_bg_opa(s, OPA_20);
+    lv_style_set_bg_opa(s, LV_OPA_20);
     lv_style_set_bg_color(s, lv_color_hex(0xFFFFFF));
     lv_style_set_radius(s, 2);
     lv_style_set_border_width(s, 0);

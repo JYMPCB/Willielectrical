@@ -1,5 +1,5 @@
 #include "ui_home.h"
-#include "../../assets/images/img_bg.h"
+#include "../../assets/images/bg.c"
 #include "../widgets/willi_start_btn.h"
 #include "../widgets/willi_program_btn.h"
 #include "../widgets/willi_free_btn.h"
@@ -8,6 +8,10 @@
 #include "../widgets/willi_stepper_btn.h"
 #include "../widgets/willi_stop_btn.h"
 #include "../widgets/willi_back_btn.h"
+#include "../widgets/willi_wifi_status.h"
+#include "app_control.h"
+#include "app_state.h"
+#include <stdio.h>
 
 typedef enum {
     HOME_MODE_PROGRAM = 0,
@@ -38,7 +42,7 @@ static willi_training_metrics_t s_metrics;
 static willi_wifi_status_t s_wifi;
 static lv_obj_t *s_clock_label = NULL;
 
-/* posiciones reales */
+/* posiciones lógicas */
 static lv_coord_t s_pos_program_y = 0;
 static lv_coord_t s_pos_free_y = 0;
 static lv_coord_t s_pos_interval_y = 0;
@@ -59,26 +63,30 @@ static lv_obj_t *home_back_root(void)
 
 static lv_obj_t *home_start_root(void)
 {
-    return willi_start_btn_get_root(s_btn_start);
+    return s_btn_start ? willi_start_btn_get_root(s_btn_start) : NULL;
 }
 
 static lv_obj_t *home_speed_root(void)
 {
-    return willi_stepper_btn_get_root(s_btn_speed);
+    return s_btn_speed ? willi_stepper_btn_get_root(s_btn_speed) : NULL;
 }
 
 static lv_obj_t *home_pace_root(void)
 {
-    return willi_stepper_btn_get_root(s_btn_pace);
+    return s_btn_pace ? willi_stepper_btn_get_root(s_btn_pace) : NULL;
 }
 
 static lv_obj_t *home_stop_root(void)
 {
-    return willi_stop_btn_get_root(s_btn_stop);
+    return s_btn_stop ? willi_stop_btn_get_root(s_btn_stop) : NULL;
 }
 
 static void home_enter_running_ui(void);
 static void home_exit_running_ui(void);
+
+/* --------------------------------------------------------- */
+/* MODE                                                      */
+/* --------------------------------------------------------- */
 
 static void home_apply_mode(home_mode_t mode)
 {
@@ -91,26 +99,38 @@ static void home_apply_mode(home_mode_t mode)
     switch(mode) {
         case HOME_MODE_PROGRAM:
             if(s_btn_program) lv_obj_add_state(s_btn_program, LV_STATE_CHECKED);
+            g_app.selected_mode = APP_MODE_PROGRAM;
             break;
 
         case HOME_MODE_FREE:
             if(s_btn_free) lv_obj_add_state(s_btn_free, LV_STATE_CHECKED);
+            g_app.selected_mode = APP_MODE_FREE;
             break;
 
         case HOME_MODE_INTERVAL:
             if(s_btn_interval) lv_obj_add_state(s_btn_interval, LV_STATE_CHECKED);
+            g_app.selected_mode = APP_MODE_INTERVAL;
             break;
     }
 
     if(s_btn_start) {
         willi_start_btn_set_mode(s_btn_start, (willi_start_mode_t)mode);
     }
+
+    g_app.ui_req_home_refresh = true;
 }
+
+/* --------------------------------------------------------- */
+/* EVENTS                                                    */
+/* --------------------------------------------------------- */
 
 static void home_back_event_cb(lv_event_t *e)
 {
     if(lv_event_get_code(e) != LV_EVENT_CLICKED) return;
-    home_exit_running_ui();
+
+    /* Por ahora BACK = STOP.
+       Así evitamos que la UI vuelva al idle mientras la lógica sigue corriendo. */
+    app_request_stop(APP_INPUT_UI);
 }
 
 static void home_program_btn_event_cb(lv_event_t *e)
@@ -137,16 +157,23 @@ static void home_interval_btn_event_cb(lv_event_t *e)
 static void home_start_event_cb(lv_event_t *e)
 {
     if(lv_event_get_code(e) != LV_EVENT_CLICKED) return;
-    home_enter_running_ui();
+    printf("START clicked | visual=%d running_flag=%d state=%d\n",
+           s_visual_state,
+           g_app.ui_show_running_screen,
+           g_app.train_state);
+    app_request_start(APP_INPUT_UI);
 }
 
 static void home_stop_event_cb(lv_event_t *e)
 {
     if(lv_event_get_code(e) != LV_EVENT_CLICKED) return;
-    home_exit_running_ui();
+    printf("STOP clicked\n");
+    app_request_stop(APP_INPUT_UI);
 }
 
-/* ---------------- anim helpers ---------------- */
+/* --------------------------------------------------------- */
+/* ANIM HELPERS                                              */
+/* --------------------------------------------------------- */
 
 static void anim_obj_y_cb(void *var, int32_t v)
 {
@@ -236,18 +263,18 @@ static void obj_anim_out_to_top(lv_obj_t *obj, lv_coord_t final_y, lv_coord_t of
 
 static void home_place_idle_layout(void)
 {
-    lv_obj_align(s_btn_program,      LV_ALIGN_BOTTOM_LEFT,   32, s_pos_program_y);
-    lv_obj_align(s_btn_free,         LV_ALIGN_BOTTOM_MID,     0, s_pos_free_y);
-    lv_obj_align(s_btn_interval,     LV_ALIGN_BOTTOM_RIGHT, -32, s_pos_interval_y);
-    lv_obj_align(home_start_root(),  LV_ALIGN_CENTER,         0, s_pos_start_y);
+    if(s_btn_program)     lv_obj_align(s_btn_program,     LV_ALIGN_BOTTOM_LEFT,   32, s_pos_program_y);
+    if(s_btn_free)        lv_obj_align(s_btn_free,        LV_ALIGN_BOTTOM_MID,     0, s_pos_free_y);
+    if(s_btn_interval)    lv_obj_align(s_btn_interval,    LV_ALIGN_BOTTOM_RIGHT, -32, s_pos_interval_y);
+    if(home_start_root()) lv_obj_align(home_start_root(), LV_ALIGN_CENTER,         0, s_pos_start_y);
 }
 
 static void home_place_running_layout(void)
 {
-    lv_obj_align(home_speed_root(), LV_ALIGN_BOTTOM_LEFT,   70, s_pos_run_left_y  + RUN_BTN_Y_TUNE);
-    lv_obj_align(home_stop_root(),  LV_ALIGN_BOTTOM_MID,     0, s_pos_run_stop_y  + RUN_BTN_Y_TUNE);
-    lv_obj_align(home_pace_root(),  LV_ALIGN_BOTTOM_RIGHT, -70, s_pos_run_right_y + RUN_BTN_Y_TUNE);
-    lv_obj_align(home_back_root(),  LV_ALIGN_TOP_MID,      0, s_pos_back_y);
+    if(home_speed_root()) lv_obj_align(home_speed_root(), LV_ALIGN_BOTTOM_LEFT,   70, s_pos_run_left_y  + RUN_BTN_Y_TUNE);
+    if(home_stop_root())  lv_obj_align(home_stop_root(),  LV_ALIGN_BOTTOM_MID,     0, s_pos_run_stop_y  + RUN_BTN_Y_TUNE);
+    if(home_pace_root())  lv_obj_align(home_pace_root(),  LV_ALIGN_BOTTOM_RIGHT, -70, s_pos_run_right_y + RUN_BTN_Y_TUNE);
+    if(home_back_root())  lv_obj_align(home_back_root(),  LV_ALIGN_TOP_MID,        0, s_pos_back_y);
 }
 
 static void home_restore_idle_layout(void)
@@ -264,27 +291,29 @@ static void home_restore_idle_layout(void)
     home_place_idle_layout();
     home_place_running_layout();
 
-    lv_obj_set_style_opa(s_btn_program, LV_OPA_COVER, 0);
-    lv_obj_set_style_opa(s_btn_free, LV_OPA_COVER, 0);
-    lv_obj_set_style_opa(s_btn_interval, LV_OPA_COVER, 0);
-    lv_obj_set_style_opa(home_start_root(), LV_OPA_COVER, 0);
-    lv_obj_set_style_opa(home_speed_root(), LV_OPA_COVER, 0);
-    lv_obj_set_style_opa(home_stop_root(), LV_OPA_COVER, 0);
-    lv_obj_set_style_opa(home_pace_root(), LV_OPA_COVER, 0);
-    lv_obj_set_style_opa(home_back_root(), LV_OPA_COVER, 0);
+    if(s_btn_program)      lv_obj_set_style_opa(s_btn_program, LV_OPA_COVER, 0);
+    if(s_btn_free)         lv_obj_set_style_opa(s_btn_free, LV_OPA_COVER, 0);
+    if(s_btn_interval)     lv_obj_set_style_opa(s_btn_interval, LV_OPA_COVER, 0);
+    if(home_start_root())  lv_obj_set_style_opa(home_start_root(), LV_OPA_COVER, 0);
+    if(home_speed_root())  lv_obj_set_style_opa(home_speed_root(), LV_OPA_COVER, 0);
+    if(home_stop_root())   lv_obj_set_style_opa(home_stop_root(), LV_OPA_COVER, 0);
+    if(home_pace_root())   lv_obj_set_style_opa(home_pace_root(), LV_OPA_COVER, 0);
+    if(home_back_root())   lv_obj_set_style_opa(home_back_root(), LV_OPA_COVER, 0);
 
-    lv_obj_clear_flag(s_btn_program, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_clear_flag(s_btn_free, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_clear_flag(s_btn_interval, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_clear_flag(home_start_root(), LV_OBJ_FLAG_HIDDEN);
+    if(s_btn_program)      lv_obj_clear_flag(s_btn_program, LV_OBJ_FLAG_HIDDEN);
+    if(s_btn_free)         lv_obj_clear_flag(s_btn_free, LV_OBJ_FLAG_HIDDEN);
+    if(s_btn_interval)     lv_obj_clear_flag(s_btn_interval, LV_OBJ_FLAG_HIDDEN);
+    if(home_start_root())  lv_obj_clear_flag(home_start_root(), LV_OBJ_FLAG_HIDDEN);
 
-    lv_obj_add_flag(home_speed_root(), LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(home_stop_root(), LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(home_pace_root(), LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(home_back_root(), LV_OBJ_FLAG_HIDDEN);
+    if(home_speed_root())  lv_obj_add_flag(home_speed_root(), LV_OBJ_FLAG_HIDDEN);
+    if(home_stop_root())   lv_obj_add_flag(home_stop_root(), LV_OBJ_FLAG_HIDDEN);
+    if(home_pace_root())   lv_obj_add_flag(home_pace_root(), LV_OBJ_FLAG_HIDDEN);
+    if(home_back_root())   lv_obj_add_flag(home_back_root(), LV_OBJ_FLAG_HIDDEN);
 }
 
-/* ---------------- transitions ---------------- */
+/* --------------------------------------------------------- */
+/* TRANSITIONS                                               */
+/* --------------------------------------------------------- */
 
 static void home_enter_running_ui(void)
 {
@@ -322,7 +351,55 @@ static void home_exit_running_ui(void)
     obj_anim_in_from_bottom(home_start_root(), s_pos_start_y,     26, 300, 340);
 }
 
-/* ---------------- create screen ---------------- */
+/* --------------------------------------------------------- */
+/* PUBLIC SYNC                                               */
+/* --------------------------------------------------------- */
+
+void ui_home_sync_with_app(void)
+{
+        printf("ui_home_sync_with_app: mode=%d running_flag=%d visual=%d state=%d\n",
+           g_app.selected_mode,
+           g_app.ui_show_running_screen,
+           s_visual_state,
+           g_app.train_state);
+           
+    switch(g_app.selected_mode) {
+        case APP_MODE_PROGRAM:
+            if(s_home_mode != HOME_MODE_PROGRAM) {
+                home_apply_mode(HOME_MODE_PROGRAM);
+            }
+            break;
+
+        case APP_MODE_FREE:
+            if(s_home_mode != HOME_MODE_FREE) {
+                home_apply_mode(HOME_MODE_FREE);
+            }
+            break;
+
+        case APP_MODE_INTERVAL:
+            if(s_home_mode != HOME_MODE_INTERVAL) {
+                home_apply_mode(HOME_MODE_INTERVAL);
+            }
+            break;
+
+        default:
+            break;
+    }
+
+    if(g_app.ui_show_running_screen) {
+        if(s_visual_state != HOME_VISUAL_RUNNING) {
+            home_enter_running_ui();
+        }
+    } else {
+        if(s_visual_state != HOME_VISUAL_IDLE) {
+            home_exit_running_ui();
+        }
+    }
+}
+
+/* --------------------------------------------------------- */
+/* CREATE SCREEN                                             */
+/* --------------------------------------------------------- */
 
 lv_obj_t *ui_home_create(void)
 {
@@ -333,20 +410,23 @@ lv_obj_t *ui_home_create(void)
     lv_obj_set_style_bg_grad_color(scr, lv_color_hex(0x1B2230), 0);
     lv_obj_set_style_bg_grad_dir(scr, LV_GRAD_DIR_HOR, 0);
 
-    lv_obj_t *bg = lv_img_create(scr);
-    lv_img_set_src(bg, &img_bg);
-    lv_obj_clear_flag(bg, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_t *bg_img = lv_image_create(scr);
+    lv_image_set_src(bg_img, &bg);
+    lv_obj_clear_flag(bg_img, LV_OBJ_FLAG_CLICKABLE);
 
-    lv_coord_t sw = lv_disp_get_hor_res(NULL);
-    lv_coord_t sh = lv_disp_get_ver_res(NULL);
-    uint32_t zoom_x = ((uint32_t)sw * 256U) / img_bg.header.w;
-    uint32_t zoom_y = ((uint32_t)sh * 256U) / img_bg.header.h;
+    int32_t sw = lv_display_get_horizontal_resolution(NULL);
+    int32_t sh = lv_display_get_vertical_resolution(NULL);
+
+    uint32_t zoom_x = ((uint32_t)sw * 256U) / bg.header.w;
+    uint32_t zoom_y = ((uint32_t)sh * 256U) / bg.header.h;
     uint32_t zoom = (zoom_x > zoom_y) ? zoom_x : zoom_y;
+
     if(zoom < 1U) zoom = 1U;
     if(zoom > 4096U) zoom = 4096U;
-    lv_img_set_zoom(bg, (uint16_t)zoom);
-    lv_obj_center(bg);
-    lv_obj_move_background(bg);
+
+    lv_image_set_scale(bg_img, (int32_t)zoom);
+    lv_obj_center(bg_img);
+    lv_obj_move_background(bg_img);
 
     lv_obj_t *title = lv_label_create(scr);
     lv_label_set_text(title, "WILLI PRO");
@@ -355,7 +435,8 @@ lv_obj_t *ui_home_create(void)
     lv_obj_align(title, LV_ALIGN_TOP_LEFT, 24, 18);
 
     willi_wifi_status_create(scr, &s_wifi, 0, 0);
-    willi_wifi_status_start(&s_wifi);
+    willi_wifi_status_hide(&s_wifi);
+    willi_wifi_status_stop(&s_wifi);
 
     s_clock_label = lv_label_create(scr);
     lv_label_set_text(s_clock_label, "10:45 AM");
@@ -404,7 +485,6 @@ lv_obj_t *ui_home_create(void)
     lv_obj_align(s_btn_interval,     LV_ALIGN_BOTTOM_RIGHT, -32, 0);
     lv_obj_align(home_start_root(),  LV_ALIGN_CENTER,         0, 0);
 
-    /* guardar offsets lógicos, no posiciones resueltas */
     s_pos_program_y   = -50;
     s_pos_free_y      = -50;
     s_pos_interval_y  = -50;
@@ -413,7 +493,7 @@ lv_obj_t *ui_home_create(void)
     s_pos_run_left_y  = -42;
     s_pos_run_stop_y  = -40;
     s_pos_run_right_y = -42;
-    s_pos_back_y      = 2;   
+    s_pos_back_y      = 2;
 
     lv_obj_add_event_cb(s_btn_program,     home_program_btn_event_cb,  LV_EVENT_CLICKED, NULL);
     lv_obj_add_event_cb(s_btn_free,        home_free_btn_event_cb,     LV_EVENT_CLICKED, NULL);
@@ -427,4 +507,73 @@ lv_obj_t *ui_home_create(void)
     home_restore_idle_layout();
 
     return scr;
+}
+
+void ui_home_set_clock_text(const char *txt)
+{
+    if(!s_clock_label) return;
+    lv_label_set_text(s_clock_label, (txt && txt[0]) ? txt : "");
+}
+
+void ui_home_set_wifi_connected(bool connected)
+{
+    if(connected) {
+        willi_wifi_status_start(&s_wifi);
+        willi_wifi_status_show(&s_wifi);
+    } else {
+        willi_wifi_status_stop(&s_wifi);
+        willi_wifi_status_hide(&s_wifi);
+    }
+}
+
+void ui_home_set_metrics(float current_speed_kmh,
+                         float target_speed_kmh,
+                         uint32_t elapsed_time_s,
+                         float distance_km,
+                         uint32_t calories)
+{
+    char buf[32];
+
+    snprintf(buf, sizeof(buf), "%.1f", (double)current_speed_kmh);
+    willi_training_metrics_set_speed(&s_metrics, buf);
+
+    if(current_speed_kmh > 0.05f) {
+        float pace = 60.0f / current_speed_kmh;
+        int mm = (int)pace;
+        int ss = (int)((pace - (float)mm) * 60.0f + 0.5f);
+        if(ss >= 60) {
+            ss -= 60;
+            mm++;
+        }
+        snprintf(buf, sizeof(buf), "%02d:%02d", mm, ss);
+    } else {
+        snprintf(buf, sizeof(buf), "--:--");
+    }
+    willi_training_metrics_set_pace(&s_metrics, buf);
+
+    snprintf(buf, sizeof(buf), "%.2f", (double)distance_km);
+    willi_training_metrics_set_distance(&s_metrics, buf);
+
+    snprintf(buf, sizeof(buf), "%lu", (unsigned long)calories);
+    willi_training_metrics_set_calories(&s_metrics, buf);
+
+    {
+        uint32_t hh = elapsed_time_s / 3600U;
+        uint32_t mm = (elapsed_time_s % 3600U) / 60U;
+        uint32_t ss = elapsed_time_s % 60U;
+
+        if(hh > 0) {
+            snprintf(buf, sizeof(buf), "%02lu:%02lu:%02lu",
+                     (unsigned long)hh,
+                     (unsigned long)mm,
+                     (unsigned long)ss);
+        } else {
+            snprintf(buf, sizeof(buf), "%02lu:%02lu",
+                     (unsigned long)mm,
+                     (unsigned long)ss);
+        }
+    }
+    willi_training_metrics_set_time(&s_metrics, buf);
+
+    (void)target_speed_kmh;
 }
