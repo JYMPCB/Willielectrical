@@ -4,7 +4,7 @@
     "board/esp32p4-builtin.cfg"
   ],
   "idf.portWin": "COM211",
-  "idf.currentSetup": "c:\\Espressif\\v5.5.1\\esp-idf",
+  "idf.currentSetup": "C:\\esp\\v5.5.3\\esp-idf",
   "idf.customExtraVars": {
     "IDF_TARGET": "esp32p4"
   },
@@ -12,7 +12,7 @@
   "clangd.arguments": [
     "--background-index",
     "--query-driver=**",
-    "--compile-commands-dir=c:\\Users\\JYM-DSN\\Will I electrical\\build"
+    "--compile-commands-dir=c:\\Users\\JYM-DSN\\Willielectrical\\build"
   ],
   "idf.flashType": "UART",
   "C_Cpp.errorSquiggles": "disabled",

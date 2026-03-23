@@ -1,6 +1,7 @@
 #include "willi_start_btn.h"
 #include <stdlib.h>
 #include <string.h>
+#include "esp_log.h"
 
 #define WILLI_GREEN         0x39FF14
 #define WILLI_GREEN_SOFT    0x7CFF5B
@@ -12,6 +13,8 @@
 #define WILLI_ORANGE_SOFT   0xFFCC66
 #define WILLI_BLUE          0x35B7FF
 #define WILLI_BLUE_SOFT     0x7FD4FF
+#define WILLI_START_BTN_USE_SHADOWS 0
+#define WILLI_START_BTN_EMBEDDED_SIMPLE 1
 
 typedef struct {
     int16_t x;
@@ -97,8 +100,12 @@ static void set_circle_style(lv_obj_t *obj, lv_color_t bg1, lv_color_t bg2, lv_c
 {
     lv_obj_set_style_radius(obj, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(obj, bg1, 0);
+#if WILLI_START_BTN_EMBEDDED_SIMPLE
+    lv_obj_set_style_bg_grad_opa(obj, LV_OPA_TRANSP, 0);
+#else
     lv_obj_set_style_bg_grad_color(obj, bg2, 0);
     lv_obj_set_style_bg_grad_dir(obj, LV_GRAD_DIR_VER, 0);
+#endif
     lv_obj_set_style_border_color(obj, border, 0);
     lv_obj_set_style_border_width(obj, border_w, 0);
 }
@@ -136,7 +143,7 @@ static lv_obj_t *create_particle(lv_obj_t *parent, const particle_cfg_t *cfg)
     lv_obj_set_style_bg_opa(p, cfg->opa, 0);
     lv_obj_set_style_border_width(p, 0, 0);
 
-    if(cfg->glow > 0) {
+    if(WILLI_START_BTN_USE_SHADOWS && cfg->glow > 0) {
         lv_obj_set_style_shadow_color(p, lv_color_hex(WILLI_GREEN), 0);
         lv_obj_set_style_shadow_width(p, cfg->glow, 0);
         lv_obj_set_style_shadow_opa(p, cfg->opa, 0);
@@ -158,7 +165,7 @@ static lv_obj_t *create_spray_particle(lv_obj_t *parent, const spray_particle_cf
     lv_obj_set_style_bg_opa(p, cfg->opa_min, 0);
     lv_obj_set_style_border_width(p, 0, 0);
 
-    if(cfg->glow > 0) {
+    if(WILLI_START_BTN_USE_SHADOWS && cfg->glow > 0) {
         lv_obj_set_style_shadow_color(p, lv_color_hex(WILLI_GREEN), 0);
         lv_obj_set_style_shadow_width(p, cfg->glow, 0);
         lv_obj_set_style_shadow_opa(p, cfg->opa_max, 0);
@@ -206,7 +213,9 @@ static void willi_start_btn_apply_mode_visual(willi_start_btn_t *btn)
 
     if(btn->ring_outer) {
         lv_obj_set_style_border_color(btn->ring_outer, c_main, 0);
+        if(WILLI_START_BTN_USE_SHADOWS) {
         lv_obj_set_style_shadow_color(btn->ring_outer, c_main, 0);
+        }
     }
 
     if(btn->ring_inner) {
@@ -214,12 +223,17 @@ static void willi_start_btn_apply_mode_visual(willi_start_btn_t *btn)
     }
 
     if(btn->glow_outer) {
+        lv_obj_set_style_border_color(btn->glow_outer, c_main, 0);
+        if(WILLI_START_BTN_USE_SHADOWS) {
         lv_obj_set_style_shadow_color(btn->glow_outer, c_main, 0);
+        }
     }
 
     if(btn->line) {
         lv_obj_set_style_bg_color(btn->line, c_main, 0);
+        if(WILLI_START_BTN_USE_SHADOWS) {
         lv_obj_set_style_shadow_color(btn->line, c_main, 0);
+        }
     }
 
     if(btn->subtitle) {
@@ -303,6 +317,11 @@ static void obj_width_anim_cb(void *var, int32_t v)
     lv_obj_set_width((lv_obj_t *)var, (lv_coord_t)v);
 }
 
+static void obj_border_opa_anim_cb(void *var, int32_t v)
+{
+    lv_obj_set_style_border_opa((lv_obj_t *)var, (lv_opa_t)v, 0);
+}
+
 /* ---------------------- events ---------------------- */
 
 static void event_cb(lv_event_t *e)
@@ -326,6 +345,7 @@ void willi_start_btn_create_particles(willi_start_btn_t *btn)
 
     for(int i = 0; i < START_BTN_PARTICLE_COUNT; i++) {
         btn->particles[i] = create_particle(btn->start_btn, &particle_map[i]);
+        lv_obj_clear_flag(btn->particles[i], LV_OBJ_FLAG_CLICKABLE);
     }
 }
 
@@ -335,6 +355,7 @@ void willi_start_btn_create_spray_particles(willi_start_btn_t *btn)
 
     for(int i = 0; i < START_BTN_SPRAY_PARTICLE_COUNT; i++) {
         btn->spray_particles[i] = create_spray_particle(btn->start_btn, &spray_map[i]);
+        lv_obj_clear_flag(btn->spray_particles[i], LV_OBJ_FLAG_CLICKABLE);
     }
 }
 
@@ -358,31 +379,42 @@ willi_start_btn_t *willi_start_btn_create(lv_obj_t *parent)
 #ifdef LV_OBJ_FLAG_OVERFLOW_VISIBLE
     lv_obj_add_flag(btn->start_btn, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
 #endif
-
+    
     btn->glow_outer = lv_obj_create(btn->start_btn);
     lv_obj_remove_style_all(btn->glow_outer);
+    lv_obj_clear_flag(btn->glow_outer, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_size(btn->glow_outer, 356, 356);
     lv_obj_center(btn->glow_outer);
     style_transparent_circle(btn->glow_outer);
+#if WILLI_START_BTN_USE_SHADOWS
     lv_obj_set_style_shadow_color(btn->glow_outer, lv_color_hex(WILLI_GREEN), 0);
     lv_obj_set_style_shadow_width(btn->glow_outer, 26, 0);
     lv_obj_set_style_shadow_spread(btn->glow_outer, 0, 0);
     lv_obj_set_style_shadow_opa(btn->glow_outer, LV_OPA_50, 0);
+#else
+    lv_obj_set_style_border_width(btn->glow_outer, 2, 0);
+    lv_obj_set_style_border_color(btn->glow_outer, lv_color_hex(WILLI_GREEN), 0);
+    lv_obj_set_style_border_opa(btn->glow_outer, LV_OPA_20, 0);
+#endif
 
     btn->ring_outer = lv_obj_create(btn->start_btn);
     lv_obj_remove_style_all(btn->ring_outer);
+    lv_obj_clear_flag(btn->ring_outer, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_size(btn->ring_outer, 340, 340);
     lv_obj_center(btn->ring_outer);
     style_transparent_circle(btn->ring_outer);
     lv_obj_set_style_border_width(btn->ring_outer, 6, 0);
     lv_obj_set_style_border_color(btn->ring_outer, lv_color_hex(WILLI_GREEN), 0);
     lv_obj_set_style_border_opa(btn->ring_outer, LV_OPA_COVER, 0);
+#if WILLI_START_BTN_USE_SHADOWS
     lv_obj_set_style_shadow_color(btn->ring_outer, lv_color_hex(WILLI_GREEN), 0);
     lv_obj_set_style_shadow_width(btn->ring_outer, 18, 0);
     lv_obj_set_style_shadow_opa(btn->ring_outer, LV_OPA_60, 0);
+#endif
 
     btn->ring_inner = lv_obj_create(btn->start_btn);
     lv_obj_remove_style_all(btn->ring_inner);
+    lv_obj_clear_flag(btn->ring_inner, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_size(btn->ring_inner, 314, 314);
     lv_obj_center(btn->ring_inner);
     style_transparent_circle(btn->ring_inner);
@@ -392,6 +424,7 @@ willi_start_btn_t *willi_start_btn_create(lv_obj_t *parent)
 
     btn->face = lv_obj_create(btn->start_btn);
     lv_obj_remove_style_all(btn->face);
+    lv_obj_clear_flag(btn->face, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_size(btn->face, 286, 286);
     lv_obj_center(btn->face);
     set_circle_style(
@@ -401,14 +434,19 @@ willi_start_btn_t *willi_start_btn_create(lv_obj_t *parent)
         lv_color_hex(WILLI_BORDER),
         2
     );
+#if WILLI_START_BTN_USE_SHADOWS
     lv_obj_set_style_shadow_color(btn->face, lv_color_black(), 0);
     lv_obj_set_style_shadow_width(btn->face, 20, 0);
     lv_obj_set_style_shadow_opa(btn->face, LV_OPA_40, 0);
+#endif
     lv_obj_set_style_pad_all(btn->face, 0, 0);
 
+    /* Pivot siempre necesario para que zoom/scale se aplique desde el centro */
     lv_obj_set_style_transform_pivot_x(btn->face, 143, 0);
     lv_obj_set_style_transform_pivot_y(btn->face, 143, 0);
+#if !WILLI_START_BTN_EMBEDDED_SIMPLE
     lv_obj_set_style_transform_zoom(btn->face, 256, 0);
+#endif
 
     btn->icon = lv_label_create(btn->face);
     lv_label_set_text(btn->icon, LV_SYMBOL_PLAY);
@@ -424,12 +462,15 @@ willi_start_btn_t *willi_start_btn_create(lv_obj_t *parent)
 
     btn->line = lv_obj_create(btn->face);
     lv_obj_remove_style_all(btn->line);
+    lv_obj_clear_flag(btn->line, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_size(btn->line, 138, 2);
     lv_obj_set_style_bg_color(btn->line, lv_color_hex(WILLI_GREEN), 0);
     lv_obj_set_style_bg_opa(btn->line, LV_OPA_90, 0);
+#if WILLI_START_BTN_USE_SHADOWS
     lv_obj_set_style_shadow_color(btn->line, lv_color_hex(WILLI_GREEN), 0);
     lv_obj_set_style_shadow_width(btn->line, 8, 0);
     lv_obj_set_style_shadow_opa(btn->line, LV_OPA_50, 0);
+#endif
     lv_obj_align(btn->line, LV_ALIGN_CENTER, 0, 44);
 
     btn->subtitle = lv_label_create(btn->face);
@@ -454,10 +495,15 @@ willi_start_btn_t *willi_start_btn_create(lv_obj_t *parent)
     lv_obj_move_foreground(btn->ring_inner);
     lv_obj_move_foreground(btn->face);
 
-    set_event_bubble_recursive(btn->start_btn);
-    lv_obj_add_event_cb(btn->start_btn, event_cb, LV_EVENT_ALL, btn);
-
+    // CRÍTICO: NO propagamos eventos para evitar loops infinitos en modo simple
+    // set_event_bubble_recursive(btn->start_btn);
+    
+    lv_obj_add_event_cb(btn->start_btn, event_cb, LV_EVENT_PRESSED, btn);
+    lv_obj_add_event_cb(btn->start_btn, event_cb, LV_EVENT_RELEASED, btn);
+    lv_obj_add_event_cb(btn->start_btn, event_cb, LV_EVENT_PRESS_LOST, btn);
+    
     willi_start_btn_apply_mode_visual(btn);
+
     return btn;
 }
 
@@ -503,6 +549,28 @@ void willi_start_btn_set_pressed(willi_start_btn_t *btn, bool pressed)
     if(!btn) return;
     if(btn->pressed == pressed) return;
 
+#if WILLI_START_BTN_EMBEDDED_SIMPLE
+    btn->pressed = pressed;
+
+    if(btn->face) {
+        /* Reducir opacidad del face al presionar, igual que los anillos verdes */
+        lv_obj_set_style_opa(btn->face, pressed ? LV_OPA_50 : LV_OPA_COVER, 0);
+    }
+
+    if(btn->ring_outer) {
+        /* Anillo exterior: reducir opacidad al presionar */
+        lv_obj_set_style_border_opa(btn->ring_outer, pressed ? LV_OPA_40 : LV_OPA_COVER, 0);
+    }
+
+    if(btn->line) {
+        /* Línea más corta */
+        lv_obj_set_width(btn->line, pressed ? 110 : 138);
+        lv_obj_set_style_bg_opa(btn->line, pressed ? LV_OPA_50 : LV_OPA_90, 0);
+    }
+
+    return;
+#endif
+
     btn->pressed = pressed;
 
     lv_anim_t a;
@@ -517,6 +585,7 @@ void willi_start_btn_set_pressed(willi_start_btn_t *btn, bool pressed)
             lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
             lv_anim_start(&a);
 
+    #if WILLI_START_BTN_USE_SHADOWS
             lv_anim_init(&a);
             lv_anim_set_var(&a, btn->face);
             lv_anim_set_exec_cb(&a, face_shadow_anim_cb);
@@ -524,6 +593,7 @@ void willi_start_btn_set_pressed(willi_start_btn_t *btn, bool pressed)
             lv_anim_set_time(&a, 120);
             lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
             lv_anim_start(&a);
+    #endif
 
             lv_anim_init(&a);
             lv_anim_set_var(&a, btn->face);
@@ -534,7 +604,7 @@ void willi_start_btn_set_pressed(willi_start_btn_t *btn, bool pressed)
             lv_anim_start(&a);
         }
 
-        if(btn->ring_outer) {
+        if(WILLI_START_BTN_USE_SHADOWS && btn->ring_outer) {
             lv_anim_init(&a);
             lv_anim_set_var(&a, btn->ring_outer);
             lv_anim_set_exec_cb(&a, obj_shadow_width_anim_cb);
@@ -552,7 +622,7 @@ void willi_start_btn_set_pressed(willi_start_btn_t *btn, bool pressed)
             lv_anim_start(&a);
         }
 
-        if(btn->glow_outer) {
+        if(WILLI_START_BTN_USE_SHADOWS && btn->glow_outer) {
             lv_anim_init(&a);
             lv_anim_set_var(&a, btn->glow_outer);
             lv_anim_set_exec_cb(&a, obj_shadow_width_anim_cb);
@@ -590,6 +660,7 @@ void willi_start_btn_set_pressed(willi_start_btn_t *btn, bool pressed)
             lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
             lv_anim_start(&a);
 
+    #if WILLI_START_BTN_USE_SHADOWS
             lv_anim_init(&a);
             lv_anim_set_var(&a, btn->face);
             lv_anim_set_exec_cb(&a, face_shadow_anim_cb);
@@ -597,6 +668,7 @@ void willi_start_btn_set_pressed(willi_start_btn_t *btn, bool pressed)
             lv_anim_set_time(&a, 160);
             lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
             lv_anim_start(&a);
+    #endif
 
             lv_anim_init(&a);
             lv_anim_set_var(&a, btn->face);
@@ -607,7 +679,7 @@ void willi_start_btn_set_pressed(willi_start_btn_t *btn, bool pressed)
             lv_anim_start(&a);
         }
 
-        if(btn->ring_outer) {
+        if(WILLI_START_BTN_USE_SHADOWS && btn->ring_outer) {
             lv_anim_init(&a);
             lv_anim_set_var(&a, btn->ring_outer);
             lv_anim_set_exec_cb(&a, obj_shadow_width_anim_cb);
@@ -625,7 +697,7 @@ void willi_start_btn_set_pressed(willi_start_btn_t *btn, bool pressed)
             lv_anim_start(&a);
         }
 
-        if(btn->glow_outer) {
+        if(WILLI_START_BTN_USE_SHADOWS && btn->glow_outer) {
             lv_anim_init(&a);
             lv_anim_set_var(&a, btn->glow_outer);
             lv_anim_set_exec_cb(&a, obj_shadow_width_anim_cb);
@@ -663,7 +735,7 @@ void willi_start_btn_start_breathing(willi_start_btn_t *btn)
 
     lv_anim_t a;
 
-    if(btn->glow_outer) {
+    if(WILLI_START_BTN_USE_SHADOWS && btn->glow_outer) {
         lv_anim_init(&a);
         lv_anim_set_var(&a, btn->glow_outer);
         lv_anim_set_exec_cb(&a, glow_width_anim_cb);
@@ -685,7 +757,7 @@ void willi_start_btn_start_breathing(willi_start_btn_t *btn)
         lv_anim_start(&a);
     }
 
-    if(btn->ring_outer) {
+    if(WILLI_START_BTN_USE_SHADOWS && btn->ring_outer) {
         lv_anim_init(&a);
         lv_anim_set_var(&a, btn->ring_outer);
         lv_anim_set_exec_cb(&a, ring_shadow_width_anim_cb);
@@ -706,6 +778,44 @@ void willi_start_btn_start_breathing(willi_start_btn_t *btn)
         lv_anim_set_path_cb(&a, lv_anim_path_ease_in_out);
         lv_anim_start(&a);
     }
+
+#if !WILLI_START_BTN_USE_SHADOWS
+    /* Breathing sin sombras: pulsar border_opa de los anillos verdes */
+    if(btn->glow_outer) {
+        lv_anim_init(&a);
+        lv_anim_set_var(&a, btn->glow_outer);
+        lv_anim_set_exec_cb(&a, obj_border_opa_anim_cb);
+        lv_anim_set_values(&a, LV_OPA_10, LV_OPA_30);
+        lv_anim_set_time(&a, 1600);
+        lv_anim_set_playback_time(&a, 1600);
+        lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+        lv_anim_set_path_cb(&a, lv_anim_path_ease_in_out);
+        lv_anim_start(&a);
+    }
+    if(btn->ring_outer) {
+        lv_anim_init(&a);
+        lv_anim_set_var(&a, btn->ring_outer);
+        lv_anim_set_exec_cb(&a, obj_border_opa_anim_cb);
+        lv_anim_set_values(&a, LV_OPA_50, LV_OPA_COVER);
+        lv_anim_set_time(&a, 1600);
+        lv_anim_set_playback_time(&a, 1600);
+        lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+        lv_anim_set_path_cb(&a, lv_anim_path_ease_in_out);
+        lv_anim_start(&a);
+    }
+    if(btn->ring_inner) {
+        lv_anim_init(&a);
+        lv_anim_set_var(&a, btn->ring_inner);
+        lv_anim_set_exec_cb(&a, obj_border_opa_anim_cb);
+        lv_anim_set_values(&a, LV_OPA_20, LV_OPA_60);
+        lv_anim_set_time(&a, 1600);
+        lv_anim_set_playback_time(&a, 1600);
+        lv_anim_set_delay(&a, 200);
+        lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+        lv_anim_set_path_cb(&a, lv_anim_path_ease_in_out);
+        lv_anim_start(&a);
+    }
+#endif
 }
 
 void willi_start_btn_start_particles_anim(willi_start_btn_t *btn)

@@ -27,13 +27,13 @@
 #define EXAMPLE_LCD_BK_LIGHT_OFF_LEVEL !EXAMPLE_LCD_BK_LIGHT_ON_LEVEL
 #define EXAMPLE_PIN_NUM_BK_LIGHT GPIO_NUM_23
 
-static bool chk(const char* tag, esp_err_t err) {
+/*static bool chk(const char* tag, esp_err_t err) {
   if (err != ESP_OK) {
     ESP_LOGE("jd9165", "%s failed: %s (0x%X)", tag, esp_err_to_name(err), (unsigned)err);
     return false;
   }
   return true;
-}
+}*/
 
 static void log_err(const char* tag, esp_err_t err) {
   ESP_LOGE("jd9165", "%s err=%s (0x%X)", tag, esp_err_to_name(err), (unsigned)err);
@@ -196,12 +196,15 @@ void jd9165_lcd::fillScreen(uint16_t color)
 
 void jd9165_lcd::te_on()
 {
-    esp_lcd_panel_io_tx_param(io_handle, 0x35,new (uint8_t[]){0x00}, 1);
+    //esp_lcd_panel_io_tx_param(io_handle, 0x35,new (uint8_t[]){0x00}, 1);
+    const uint8_t data_35[] = {0x00};
+    esp_lcd_panel_io_tx_param(io_handle, 0x35, data_35, sizeof(data_35));
 }
 
 void jd9165_lcd::te_off()
 {
-    esp_lcd_panel_io_tx_param(io_handle, 0x34,new (uint8_t[]){0x00}, 0);
+    //esp_lcd_panel_io_tx_param(io_handle, 0x34,new (uint8_t[]){0x00}, 0);
+    esp_lcd_panel_io_tx_param(io_handle, 0x34, nullptr, 0);
 }
 
 uint16_t jd9165_lcd::width()

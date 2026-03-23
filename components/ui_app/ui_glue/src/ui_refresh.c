@@ -252,7 +252,7 @@ void ui_refresh_process(void)
 void ui_refresh_cb(lv_timer_t *t)
 {
     (void)t;
-    printf("ui_refresh_cb tick\n");
+    //printf("ui_refresh_cb tick\n");
     app_logic_process();
     ui_refresh_process();
 }

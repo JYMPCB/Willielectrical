@@ -8,4 +8,5 @@ idf_component_register(
     REQUIRES
         bus
         vfd_link
+        app_core
 )

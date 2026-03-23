@@ -1,16 +1,17 @@
 #include "display_port.h"
 
-#include <stdbool.h>
+#include <stdio.h>
 #include <stdint.h>
-#include <stdlib.h>
+#include <stdbool.h>
+#include <string.h>
 
-#include "esp_err.h"
-#include "esp_heap_caps.h"
-#include "esp_lcd_mipi_dsi.h"
-#include "esp_lcd_panel_ops.h"
-#include "esp_log.h"
-
+#include "lv_conf.h"
 #include "lvgl.h"
+
+#include "esp_log.h"
+#include "esp_heap_caps.h"
+#include "esp_check.h"
+#include "esp_lcd_mipi_dsi.h"
 
 #include "pins_config.h"
 #include "jd9165_lcd.h"
@@ -19,14 +20,18 @@
 
 static const char *TAG = "display_port";
 
-static jd9165_lcd s_lcd(LCD_RST);
-static gt911_touch s_touch(TP_I2C_SDA, TP_I2C_SCL, TP_RST, TP_INT);
+/* Objetos de hardware */
+static jd9165_lcd lcd(LCD_RST);
+static gt911_touch touch(TP_I2C_SDA, TP_I2C_SCL, TP_RST, TP_INT);
 
+/* LVGL 9 */
 static lv_display_t *s_display = nullptr;
-static lv_indev_t *s_indev = nullptr;
-static bool s_flush_enabled = true;
-static bool s_flush_async = false;
+static lv_indev_t   *s_indev   = nullptr;
 
+/* Estado */
+static bool s_flush_enabled = true;
+
+/* Resolución */
 #ifndef LCD_H_RES
 #define LCD_H_RES 1024
 #endif
@@ -35,15 +40,17 @@ static bool s_flush_async = false;
 #define LCD_V_RES 600
 #endif
 
-#ifndef LCD_DRAW_BUF_LINES
-#define LCD_DRAW_BUF_LINES 40
-#endif
-
-#define DRAW_BUF_PIXELS (LCD_H_RES * LCD_DRAW_BUF_LINES)
+/* ===============================================================
+ * Buffers completos, igual concepto que en LVGL 8
+ * =============================================================== */
+#define DRAW_BUF_PIXELS  (LCD_H_RES * LCD_V_RES)
 
 static lv_color_t *s_buf1 = nullptr;
 static lv_color_t *s_buf2 = nullptr;
 
+/*---------------------------------------------------------------
+ * Flush callback LVGL 9
+ *--------------------------------------------------------------*/
 static void my_disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
 {
     LV_UNUSED(disp);
@@ -58,6 +65,7 @@ static void my_disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px
     int32_t x2 = area->x2;
     int32_t y2 = area->y2;
 
+    /* Recorte defensivo */
     if(x2 < 0 || y2 < 0 || x1 >= LCD_H_RES || y1 >= LCD_V_RES) {
         lv_display_flush_ready(disp);
         return;
@@ -68,7 +76,7 @@ static void my_disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px
     if(x2 >= LCD_H_RES) x2 = LCD_H_RES - 1;
     if(y2 >= LCD_V_RES) y2 = LCD_V_RES - 1;
 
-    esp_err_t err = s_lcd.lcd_draw_bitmap(
+    esp_err_t err = lcd.lcd_draw_bitmap(
         (uint16_t)x1,
         (uint16_t)y1,
         (uint16_t)(x2 + 1),
@@ -80,11 +88,11 @@ static void my_disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px
         ESP_LOGE(TAG, "lcd_draw_bitmap failed: %s", esp_err_to_name(err));
         lv_display_flush_ready(disp);
     }
-    else if(!s_flush_async) {
-        lv_display_flush_ready(disp);
-    }
 }
 
+/*---------------------------------------------------------------
+ * Callback async del panel: avisa a LVGL que terminó el flush
+ *--------------------------------------------------------------*/
 static bool lcd_color_trans_done_cb(esp_lcd_panel_handle_t panel,
                                     esp_lcd_dpi_panel_event_data_t *edata,
                                     void *user_ctx)
@@ -96,10 +104,12 @@ static bool lcd_color_trans_done_cb(esp_lcd_panel_handle_t panel,
     if(disp) {
         lv_display_flush_ready(disp);
     }
-
     return false;
 }
 
+/*---------------------------------------------------------------
+ * Touch read callback LVGL 9
+ *--------------------------------------------------------------*/
 static void my_touchpad_read(lv_indev_t *indev, lv_indev_data_t *data)
 {
     LV_UNUSED(indev);
@@ -107,16 +117,18 @@ static void my_touchpad_read(lv_indev_t *indev, lv_indev_data_t *data)
     uint16_t x = 0;
     uint16_t y = 0;
 
-    if(s_touch.getTouch(&x, &y)) {
+    if(touch.getTouch(&x, &y)) {
         data->state = LV_INDEV_STATE_PRESSED;
         data->point.x = (lv_coord_t)x;
         data->point.y = (lv_coord_t)y;
-    }
-    else {
+    } else {
         data->state = LV_INDEV_STATE_RELEASED;
     }
 }
 
+/*---------------------------------------------------------------
+ * Rotación
+ *--------------------------------------------------------------*/
 static void display_set_rotation(lv_display_rotation_t rot)
 {
     if(!s_display) return;
@@ -125,40 +137,50 @@ static void display_set_rotation(lv_display_rotation_t rot)
 
     switch(rot) {
         case LV_DISPLAY_ROTATION_0:
-            s_touch.set_rotation(0);
+            touch.set_rotation(0);
             break;
         case LV_DISPLAY_ROTATION_90:
-            s_touch.set_rotation(1);
+            touch.set_rotation(1);
             break;
         case LV_DISPLAY_ROTATION_180:
-            s_touch.set_rotation(2);
+            touch.set_rotation(2);
             break;
         case LV_DISPLAY_ROTATION_270:
-            s_touch.set_rotation(3);
+            touch.set_rotation(3);
             break;
         default:
-            s_touch.set_rotation(0);
+            touch.set_rotation(0);
             break;
     }
 }
 
+/*---------------------------------------------------------------
+ * Init principal
+ *--------------------------------------------------------------*/
 bool display_port_init(void)
 {
     ESP_LOGI(TAG, "Init LCD");
-    s_lcd.begin();
+    lcd.begin();
 
     ESP_LOGI(TAG, "Init touch");
-    s_touch.begin();
+    touch.begin();
 
     ESP_LOGI(TAG, "Init LVGL");
     lv_init();
 
     size_t buf_size = DRAW_BUF_PIXELS * sizeof(lv_color_t);
 
-    ESP_LOGI(TAG, "Alloc draw buffers: %u bytes c/u (%u lines)", (unsigned)buf_size, (unsigned)LCD_DRAW_BUF_LINES);
+    ESP_LOGI(TAG, "Alloc draw buffers: %u bytes c/u", (unsigned)buf_size);
 
-    s_buf1 = (lv_color_t *)heap_caps_malloc(buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    s_buf2 = (lv_color_t *)heap_caps_malloc(buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    s_buf1 = (lv_color_t *)heap_caps_malloc(
+        buf_size,
+        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT
+    );
+
+    s_buf2 = (lv_color_t *)heap_caps_malloc(
+        buf_size,
+        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT
+    );
 
     if(!s_buf1 || !s_buf2) {
         ESP_LOGE(TAG, "No se pudieron reservar draw buffers completos en PSRAM");
@@ -183,20 +205,28 @@ bool display_port_init(void)
         return false;
     }
 
-    lv_display_set_buffers(s_display, s_buf1, s_buf2, buf_size, LV_DISPLAY_RENDER_MODE_PARTIAL);
+    lv_display_set_buffers(
+        s_display,
+        s_buf1,
+        s_buf2,
+        buf_size,
+        LV_DISPLAY_RENDER_MODE_FULL
+    );
+
     lv_display_set_flush_cb(s_display, my_disp_flush);
     lv_display_set_default(s_display);
 
     esp_lcd_dpi_panel_event_callbacks_t cbs = {};
     cbs.on_color_trans_done = lcd_color_trans_done_cb;
 
-    esp_err_t err = esp_lcd_dpi_panel_register_event_callbacks(s_lcd.get_panel_handle(), &cbs, s_display);
+    esp_err_t err = esp_lcd_dpi_panel_register_event_callbacks(
+        lcd.get_panel_handle(),
+        &cbs,
+        s_display
+    );
+
     if(err != ESP_OK) {
-        s_flush_async = false;
         ESP_LOGW(TAG, "No se pudo registrar on_color_trans_done: %s", esp_err_to_name(err));
-    }
-    else {
-        s_flush_async = true;
     }
 
     s_indev = lv_indev_create();
@@ -223,4 +253,14 @@ bool display_port_init(void)
 uint32_t display_port_lvgl_handler(void)
 {
     return lv_timer_handler();
+}
+
+void display_port_set_flush_enabled(bool en)
+{
+    s_flush_enabled = en;
+}
+
+bool display_port_get_flush_enabled(void)
+{
+    return s_flush_enabled;
 }

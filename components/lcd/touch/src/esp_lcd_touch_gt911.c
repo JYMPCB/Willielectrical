@@ -267,7 +267,9 @@ static esp_err_t touch_gt911_i2c_write(esp_lcd_touch_handle_t tp, uint16_t reg, 
 
     // *INDENT-OFF*
     /* Write data */
-    return esp_lcd_panel_io_tx_param(tp->io, reg, (uint8_t[]){data}, 1);
+    //return esp_lcd_panel_io_tx_param(tp->io, reg, (uint8_t[]){data}, 1);
+    uint8_t tx_data[1] = { data };
+    return esp_lcd_panel_io_tx_param(tp->io, reg, tx_data, sizeof(tx_data));
     // *INDENT-ON*
 }
 

@@ -14,9 +14,9 @@ extern "C" {
 #include "esp_private/esp_clk.h"
 
 #define EN_DISPLAY 1
-#define EN_AUDIO   1
+#define EN_AUDIO   0
 #define EN_TASKS   1
-#define EN_WIFI    1
+#define EN_WIFI    0
 #define EN_RS485   1
 #define EN_SERVICES 0
 #define EN_TI 0
@@ -28,8 +28,8 @@ extern "C" {
 #include "audio_mgr.h"
 #endif
 #if EN_TASKS
-#include "ui_refresh.h"
 #include "app_globals.h"
+#include "ui_refresh.h"
 #include "tasks.h"
 #include "app_state.h"
 #include "app_logic.h"
@@ -41,7 +41,6 @@ extern "C" {
 #include "handlebar_link.h"
 #include "vfd_link.h"
 #endif
-
 #if EN_SERVICES
 #include "service_mgr.h"
 #endif
@@ -102,6 +101,7 @@ void app_init(void)
         ESP_LOGE(TAG, "display_port_init FAILED -> halt");
         while(1) vTaskDelay(pdMS_TO_TICKS(100));
     }
+
 #endif
 
 #if EN_AUDIO
@@ -110,12 +110,12 @@ void app_init(void)
 #endif
 
 #if EN_TASKS
-    app_state_init();
-    app_logic_init();
-    ui_refresh_init();
-    ui_refresh_start_timer();
-    startTasks();
-    ESP_LOGI(TAG, "App core + UI refresh initialized");
+    app_state_init(); ESP_LOGI(TAG, "App core initialized");
+    app_logic_init(); ESP_LOGI(TAG, "App logic initialized");
+    ui_refresh_init(); ESP_LOGI(TAG, "UI refresh initialized");
+    ui_refresh_start_timer(); ESP_LOGI(TAG, "UI refresh timer started");
+    startTasks(); ESP_LOGI(TAG, "App core + UI refresh initialized");
+    
 #endif
 
 #if EN_WIFI

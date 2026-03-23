@@ -10,10 +10,8 @@
 
 static void style_root(lv_obj_t *obj)
 {
-    lv_obj_remove_style_all(obj);
     lv_obj_set_size(obj, 250, 68);
     lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(obj, LV_OBJ_FLAG_CLICKABLE);
 
     lv_obj_set_style_radius(obj, 14, 0);
     lv_obj_set_style_bg_color(obj, lv_color_hex(STOP_BG_1), 0);
@@ -29,57 +27,13 @@ static void style_root(lv_obj_t *obj)
     lv_obj_set_style_shadow_width(obj, 12, 0);
     lv_obj_set_style_shadow_opa(obj, LV_OPA_20, 0);
 
+    lv_obj_set_style_bg_color(obj, lv_color_hex(0x1A0B0D), LV_STATE_PRESSED);
+    lv_obj_set_style_border_opa(obj, LV_OPA_80, LV_STATE_PRESSED);
+    lv_obj_set_style_shadow_width(obj, 6, LV_STATE_PRESSED);
+    lv_obj_set_style_shadow_opa(obj, LV_OPA_10, LV_STATE_PRESSED);
+    lv_obj_set_style_translate_y(obj, 2, LV_STATE_PRESSED);
+
     lv_obj_set_style_pad_all(obj, 0, 0);
-}
-
-static void style_face(lv_obj_t *obj)
-{
-    lv_obj_remove_style_all(obj);
-    lv_obj_set_size(obj, LV_PCT(100), LV_PCT(100));
-    lv_obj_center(obj);
-
-    lv_obj_set_style_radius(obj, 14, 0);
-    lv_obj_set_style_bg_opa(obj, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(obj, 0, 0);
-
-    lv_obj_set_style_transform_zoom(obj, 256, 0);
-    lv_obj_set_style_transform_pivot_x(obj, 125, 0);
-    lv_obj_set_style_transform_pivot_y(obj, 34, 0);
-}
-
-static void press_y_cb(void *var, int32_t v)
-{
-    lv_obj_set_style_translate_y((lv_obj_t *)var, (lv_coord_t)v, 0);
-}
-
-static void press_zoom_cb(void *var, int32_t v)
-{
-    lv_obj_set_style_transform_zoom((lv_obj_t *)var, (lv_coord_t)v, 0);
-}
-
-static void shadow_width_cb(void *var, int32_t v)
-{
-    lv_obj_set_style_shadow_width((lv_obj_t *)var, (lv_coord_t)v, 0);
-}
-
-static void shadow_opa_cb(void *var, int32_t v)
-{
-    lv_obj_set_style_shadow_opa((lv_obj_t *)var, (lv_opa_t)v, 0);
-}
-
-static void event_cb(lv_event_t *e)
-{
-    willi_stop_btn_t *btn = (willi_stop_btn_t *)lv_event_get_user_data(e);
-    lv_event_code_t code = lv_event_get_code(e);
-
-    if(!btn) return;
-
-    if(code == LV_EVENT_PRESSED) {
-        willi_stop_btn_set_pressed(btn, true);
-    }
-    else if(code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
-        willi_stop_btn_set_pressed(btn, false);
-    }
 }
 
 willi_stop_btn_t *willi_stop_btn_create(lv_obj_t *parent)
@@ -89,14 +43,14 @@ willi_stop_btn_t *willi_stop_btn_create(lv_obj_t *parent)
 
     btn->pressed = false;
 
-    btn->root = lv_obj_create(parent);
+    btn->root = lv_btn_create(parent);
     style_root(btn->root);
 
-    btn->face = lv_obj_create(btn->root);
-    style_face(btn->face);
+    btn->face = btn->root;
 
-    btn->icon_box = lv_obj_create(btn->face);
+    btn->icon_box = lv_obj_create(btn->root);
     lv_obj_remove_style_all(btn->icon_box);
+    lv_obj_clear_flag(btn->icon_box, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_size(btn->icon_box, 18, 18);
     lv_obj_set_style_radius(btn->icon_box, 4, 0);
     lv_obj_set_style_bg_color(btn->icon_box, lv_color_hex(STOP_RED_SOFT), 0);
@@ -104,15 +58,17 @@ willi_stop_btn_t *willi_stop_btn_create(lv_obj_t *parent)
     lv_obj_set_style_shadow_color(btn->icon_box, lv_color_hex(STOP_RED), 0);
     lv_obj_set_style_shadow_width(btn->icon_box, 8, 0);
     lv_obj_set_style_shadow_opa(btn->icon_box, LV_OPA_30, 0);
+    lv_obj_set_style_bg_opa(btn->icon_box, LV_OPA_70, LV_STATE_PRESSED);
     lv_obj_align(btn->icon_box, LV_ALIGN_CENTER, -68, 0);
 
-    btn->label = lv_label_create(btn->face);
+    btn->label = lv_label_create(btn->root);
     lv_label_set_text(btn->label, "DETENER");
+    lv_obj_clear_flag(btn->label, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_style_text_color(btn->label, lv_color_hex(STOP_TEXT), 0);
     lv_obj_set_style_text_font(btn->label, &lv_font_montserrat_26, 0);
+    lv_obj_set_style_text_opa(btn->label, LV_OPA_70, LV_STATE_PRESSED);
     lv_obj_align(btn->label, LV_ALIGN_CENTER, 26, 0);
 
-    lv_obj_add_event_cb(btn->root, event_cb, LV_EVENT_ALL, btn);
     return btn;
 }
 
@@ -123,81 +79,6 @@ lv_obj_t *willi_stop_btn_get_root(willi_stop_btn_t *btn)
 
 void willi_stop_btn_set_pressed(willi_stop_btn_t *btn, bool pressed)
 {
-    if(!btn) return;
-    if(btn->pressed == pressed) return;
-
-    btn->pressed = pressed;
-
-    lv_anim_del(btn->face, press_y_cb);
-    lv_anim_del(btn->face, press_zoom_cb);
-    lv_anim_del(btn->root, shadow_width_cb);
-    lv_anim_del(btn->root, shadow_opa_cb);
-
-    lv_anim_t a;
-
-    if(pressed) {
-        lv_anim_init(&a);
-        lv_anim_set_var(&a, btn->face);
-        lv_anim_set_values(&a, 0, 4);
-        lv_anim_set_time(&a, 90);
-        lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
-        lv_anim_set_exec_cb(&a, press_y_cb);
-        lv_anim_start(&a);
-
-        lv_anim_init(&a);
-        lv_anim_set_var(&a, btn->face);
-        lv_anim_set_values(&a, 256, 244);
-        lv_anim_set_time(&a, 90);
-        lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
-        lv_anim_set_exec_cb(&a, press_zoom_cb);
-        lv_anim_start(&a);
-
-        lv_anim_init(&a);
-        lv_anim_set_var(&a, btn->root);
-        lv_anim_set_values(&a, 12, 6);
-        lv_anim_set_time(&a, 90);
-        lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
-        lv_anim_set_exec_cb(&a, shadow_width_cb);
-        lv_anim_start(&a);
-
-        lv_anim_init(&a);
-        lv_anim_set_var(&a, btn->root);
-        lv_anim_set_values(&a, LV_OPA_20, LV_OPA_10);
-        lv_anim_set_time(&a, 90);
-        lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
-        lv_anim_set_exec_cb(&a, shadow_opa_cb);
-        lv_anim_start(&a);
-    } else {
-        lv_anim_init(&a);
-        lv_anim_set_var(&a, btn->face);
-        lv_anim_set_values(&a, 4, 0);
-        lv_anim_set_time(&a, 150);
-        lv_anim_set_path_cb(&a, lv_anim_path_overshoot);
-        lv_anim_set_exec_cb(&a, press_y_cb);
-        lv_anim_start(&a);
-
-        lv_anim_init(&a);
-        lv_anim_set_var(&a, btn->face);
-        lv_anim_set_values(&a, 244, 256);
-        lv_anim_set_time(&a, 150);
-        lv_anim_set_path_cb(&a, lv_anim_path_overshoot);
-        lv_anim_set_exec_cb(&a, press_zoom_cb);
-        lv_anim_start(&a);
-
-        lv_anim_init(&a);
-        lv_anim_set_var(&a, btn->root);
-        lv_anim_set_values(&a, 6, 12);
-        lv_anim_set_time(&a, 150);
-        lv_anim_set_path_cb(&a, lv_anim_path_overshoot);
-        lv_anim_set_exec_cb(&a, shadow_width_cb);
-        lv_anim_start(&a);
-
-        lv_anim_init(&a);
-        lv_anim_set_var(&a, btn->root);
-        lv_anim_set_values(&a, LV_OPA_10, LV_OPA_20);
-        lv_anim_set_time(&a, 150);
-        lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
-        lv_anim_set_exec_cb(&a, shadow_opa_cb);
-        lv_anim_start(&a);
-    }
+    (void)btn;
+    (void)pressed;
 }

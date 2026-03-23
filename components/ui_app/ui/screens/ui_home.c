@@ -12,6 +12,7 @@
 #include "app_control.h"
 #include "app_state.h"
 #include <stdio.h>
+#include "esp_log.h"
 
 typedef enum {
     HOME_MODE_PROGRAM = 0,
@@ -128,8 +129,7 @@ static void home_back_event_cb(lv_event_t *e)
 {
     if(lv_event_get_code(e) != LV_EVENT_CLICKED) return;
 
-    /* Por ahora BACK = STOP.
-       Así evitamos que la UI vuelva al idle mientras la lógica sigue corriendo. */
+    app_request_exit_running_screen(APP_INPUT_UI);
     app_request_stop(APP_INPUT_UI);
 }
 
@@ -156,7 +156,7 @@ static void home_interval_btn_event_cb(lv_event_t *e)
 
 static void home_start_event_cb(lv_event_t *e)
 {
-    if(lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+    if(lv_event_get_code(e) != LV_EVENT_RELEASED) return;
     printf("START clicked | visual=%d running_flag=%d state=%d\n",
            s_visual_state,
            g_app.ui_show_running_screen,
@@ -400,23 +400,34 @@ void ui_home_sync_with_app(void)
 /* --------------------------------------------------------- */
 /* CREATE SCREEN                                             */
 /* --------------------------------------------------------- */
-
+/*
 lv_obj_t *ui_home_create(void)
 {
-    lv_obj_t *scr = lv_obj_create(NULL);
+   lv_obj_t *scr = lv_obj_create(NULL);
     lv_obj_clear_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
 
+    // Fondo degradado base (opcional pero ayuda a ver si el bg falla)
     lv_obj_set_style_bg_color(scr, lv_color_hex(0x0A0D12), 0);
     lv_obj_set_style_bg_grad_color(scr, lv_color_hex(0x1B2230), 0);
     lv_obj_set_style_bg_grad_dir(scr, LV_GRAD_DIR_HOR, 0);
 
+    // Imagen de fondo
     lv_obj_t *bg_img = lv_image_create(scr);
     lv_image_set_src(bg_img, &bg);
+    ESP_LOGI("ui_home", "bg src assigned");
     lv_obj_clear_flag(bg_img, LV_OBJ_FLAG_CLICKABLE);
 
+    // Resolución de pantalla
     int32_t sw = lv_display_get_horizontal_resolution(NULL);
     int32_t sh = lv_display_get_vertical_resolution(NULL);
 
+    // ⚠️ Protección por si el asset está mal
+    if(bg.header.w == 0 || bg.header.h == 0) {
+        LV_LOG_ERROR("BG image header inválido");
+        return scr;
+    }
+
+    // Cálculo de zoom
     uint32_t zoom_x = ((uint32_t)sw * 256U) / bg.header.w;
     uint32_t zoom_y = ((uint32_t)sh * 256U) / bg.header.h;
     uint32_t zoom = (zoom_x > zoom_y) ? zoom_x : zoom_y;
@@ -424,8 +435,37 @@ lv_obj_t *ui_home_create(void)
     if(zoom < 1U) zoom = 1U;
     if(zoom > 4096U) zoom = 4096U;
 
-    lv_image_set_scale(bg_img, (int32_t)zoom);
+    //lv_image_set_scale(bg_img, (int32_t)zoom);
     lv_obj_center(bg_img);
+    lv_obj_move_background(bg_img);
+
+    return scr;
+}*/
+
+
+lv_obj_t *ui_home_create(void)
+{
+    lv_obj_t *scr = lv_obj_create(NULL);
+    lv_obj_clear_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
+
+    //Fondo degradado base
+    lv_obj_set_style_bg_color(scr, lv_color_hex(0x0A0D12), 0);
+    lv_obj_set_style_bg_grad_color(scr, lv_color_hex(0x1B2230), 0);
+    lv_obj_set_style_bg_grad_dir(scr, LV_GRAD_DIR_HOR, 0);
+
+    //Imagen de fondo        
+    lv_obj_t *bg_img = lv_image_create(scr);
+    lv_image_set_src(bg_img, &bg);
+    lv_obj_clear_flag(bg_img, LV_OBJ_FLAG_CLICKABLE);
+
+    // Evita el escalado manual (problematico con assets indexados I8 en este target)
+    // y usa el modo nativo de imagen para llenar el area del widget.
+    int32_t sw = lv_display_get_horizontal_resolution(NULL);
+    int32_t sh = lv_display_get_vertical_resolution(NULL);
+    lv_obj_set_size(bg_img, sw, sh);
+    lv_image_set_antialias(bg_img, false);
+    lv_image_set_inner_align(bg_img, LV_IMAGE_ALIGN_STRETCH);
+    lv_obj_align(bg_img, LV_ALIGN_CENTER, 0, 0);
     lv_obj_move_background(bg_img);
 
     lv_obj_t *title = lv_label_create(scr);
@@ -499,7 +539,7 @@ lv_obj_t *ui_home_create(void)
     lv_obj_add_event_cb(s_btn_free,        home_free_btn_event_cb,     LV_EVENT_CLICKED, NULL);
     lv_obj_add_event_cb(s_btn_interval,    home_interval_btn_event_cb, LV_EVENT_CLICKED, NULL);
 
-    lv_obj_add_event_cb(home_start_root(), home_start_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(home_start_root(), home_start_event_cb, LV_EVENT_RELEASED, NULL);
     lv_obj_add_event_cb(home_stop_root(),  home_stop_event_cb,  LV_EVENT_CLICKED, NULL);
     lv_obj_add_event_cb(s_btn_back,        home_back_event_cb,  LV_EVENT_CLICKED, NULL);
 

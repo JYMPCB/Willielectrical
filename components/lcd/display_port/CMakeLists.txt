@@ -4,6 +4,7 @@ idf_component_register(
   INCLUDE_DIRS
     "include"
   REQUIRES
+    esp_lvgl_port
     willi_common
     ui_app
     MIPI

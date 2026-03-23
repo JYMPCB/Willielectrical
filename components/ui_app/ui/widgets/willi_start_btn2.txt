@@ -1,0 +1,383 @@
+#include "willi_start_btn.h"
+#include <stdlib.h>
+#include <string.h>
+
+#define WILLI_GREEN       0x39FF14
+#define WILLI_GREEN_SOFT  0x7CFF5B
+#define WILLI_BG_FACE     0x1A2230
+#define WILLI_BORDER      0x4D5866
+#define WILLI_TEXT_SUB    0xD6D6D6
+#define WILLI_ORANGE      0xFFAA1D
+#define WILLI_BLUE        0x35B7FF
+
+#define START_BTN_ROOT_W  320
+#define START_BTN_ROOT_H  320
+#define START_BTN_GLOW_W  250
+#define START_BTN_GLOW_H  250
+#define START_BTN_RING_W  230
+#define START_BTN_RING_H  230
+#define START_BTN_FACE_W  180
+#define START_BTN_FACE_H  180
+
+static lv_color_t mode_main_color(willi_start_mode_t mode)
+{
+    switch(mode) {
+        case WILLI_START_MODE_PROGRAM:  return lv_color_hex(WILLI_ORANGE);
+        case WILLI_START_MODE_INTERVAL: return lv_color_hex(WILLI_BLUE);
+        case WILLI_START_MODE_FREE:
+        default:                        return lv_color_hex(WILLI_GREEN);
+    }
+}
+
+static lv_color_t mode_soft_color(willi_start_mode_t mode)
+{
+    switch(mode) {
+        case WILLI_START_MODE_PROGRAM:  return lv_color_hex(0xFFCC66);
+        case WILLI_START_MODE_INTERVAL: return lv_color_hex(0x7FD4FF);
+        case WILLI_START_MODE_FREE:
+        default:                        return lv_color_hex(WILLI_GREEN_SOFT);
+    }
+}
+
+static const char *mode_subtitle_text(willi_start_mode_t mode)
+{
+    switch(mode) {
+        case WILLI_START_MODE_PROGRAM:  return "Programado";
+        case WILLI_START_MODE_INTERVAL: return "Intervalado";
+        case WILLI_START_MODE_FREE:
+        default:                        return "Libre";
+    }
+}
+
+static void willi_start_btn_apply_mode_visual(willi_start_btn_t *btn)
+{
+    if(!btn) return;
+
+    lv_color_t c_main = mode_main_color(btn->mode);
+    lv_color_t c_soft = mode_soft_color(btn->mode);
+
+    if(btn->glow_outer) {
+        lv_obj_set_style_border_color(btn->glow_outer, c_main, 0);
+    }
+
+    if(btn->ring_outer) {
+        lv_obj_set_style_border_color(btn->ring_outer, c_main, 0);
+    }
+
+    if(btn->ring_inner) {
+        lv_obj_set_style_border_color(btn->ring_inner, c_soft, 0);
+    }
+
+    if(btn->line) {
+        lv_obj_set_style_bg_color(btn->line, c_main, 0);
+    }
+
+    if(btn->subtitle) {
+        lv_label_set_text(btn->subtitle, mode_subtitle_text(btn->mode));
+    }
+}
+
+static void press_anim_y_cb(void *var, int32_t v)
+{
+    lv_obj_set_style_translate_y((lv_obj_t *)var, (lv_coord_t)v, 0);
+}
+
+static void face_shadow_anim_cb(void *var, int32_t v)
+{
+    lv_obj_set_style_shadow_width((lv_obj_t *)var, (lv_coord_t)v, 0);
+}
+
+static void obj_width_anim_cb(void *var, int32_t v)
+{
+    lv_obj_set_width((lv_obj_t *)var, (lv_coord_t)v);
+}
+
+static void glow_border_opa_anim_cb(void *var, int32_t v)
+{
+    lv_obj_set_style_border_opa((lv_obj_t *)var, (lv_opa_t)v, 0);
+}
+
+static void event_cb(lv_event_t *e)
+{
+    willi_start_btn_t *btn = (willi_start_btn_t *)lv_event_get_user_data(e);
+    lv_event_code_t code = lv_event_get_code(e);
+
+    if(code == LV_EVENT_PRESSED) {
+        willi_start_btn_set_pressed(btn, true);
+    }
+    else if(code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
+        willi_start_btn_set_pressed(btn, false);
+    }
+}
+
+void willi_start_btn_create_particles(willi_start_btn_t *btn)
+{
+    if(!btn) return;
+    for(int i = 0; i < START_BTN_PARTICLE_COUNT; i++) {
+        btn->particles[i] = NULL;
+    }
+}
+
+void willi_start_btn_create_spray_particles(willi_start_btn_t *btn)
+{
+    if(!btn) return;
+    for(int i = 0; i < START_BTN_SPRAY_PARTICLE_COUNT; i++) {
+        btn->spray_particles[i] = NULL;
+    }
+}
+
+willi_start_btn_t *willi_start_btn_create(lv_obj_t *parent)
+{
+    willi_start_btn_t *btn = (willi_start_btn_t *)malloc(sizeof(willi_start_btn_t));
+    if(!btn) return NULL;
+
+    memset(btn, 0, sizeof(*btn));
+    btn->pressed = false;
+    btn->mode = WILLI_START_MODE_FREE;
+
+    btn->start_btn = lv_obj_create(parent);
+    lv_obj_remove_style_all(btn->start_btn);
+    lv_obj_set_size(btn->start_btn, START_BTN_ROOT_W, START_BTN_ROOT_H);
+    lv_obj_center(btn->start_btn);
+    lv_obj_clear_flag(btn->start_btn, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(btn->start_btn, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_style_bg_opa(btn->start_btn, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_opa(btn->start_btn, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_pad_all(btn->start_btn, 0, 0);
+
+#ifdef LV_OBJ_FLAG_OVERFLOW_VISIBLE
+    lv_obj_add_flag(btn->start_btn, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
+#endif
+
+    btn->glow_outer = lv_obj_create(btn->start_btn);
+    lv_obj_remove_style_all(btn->glow_outer);
+    lv_obj_set_size(btn->glow_outer, START_BTN_GLOW_W, START_BTN_GLOW_H);
+    lv_obj_center(btn->glow_outer);
+    lv_obj_set_style_radius(btn->glow_outer, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_opa(btn->glow_outer, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(btn->glow_outer, 8, 0);
+    lv_obj_set_style_border_color(btn->glow_outer, lv_color_hex(WILLI_GREEN), 0);
+    lv_obj_set_style_border_opa(btn->glow_outer, LV_OPA_10, 0);
+    lv_obj_clear_flag(btn->glow_outer, LV_OBJ_FLAG_CLICKABLE);
+
+    btn->ring_outer = lv_obj_create(btn->start_btn);
+    lv_obj_remove_style_all(btn->ring_outer);
+    lv_obj_set_size(btn->ring_outer, START_BTN_RING_W, START_BTN_RING_H);
+    lv_obj_center(btn->ring_outer);
+    lv_obj_set_style_radius(btn->ring_outer, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_opa(btn->ring_outer, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(btn->ring_outer, 3, 0);
+    lv_obj_set_style_border_color(btn->ring_outer, lv_color_hex(WILLI_GREEN), 0);
+    lv_obj_set_style_border_opa(btn->ring_outer, LV_OPA_COVER, 0);
+    lv_obj_clear_flag(btn->ring_outer, LV_OBJ_FLAG_CLICKABLE);
+
+    btn->ring_inner = lv_obj_create(btn->start_btn);
+    lv_obj_remove_style_all(btn->ring_inner);
+    lv_obj_set_size(btn->ring_inner, 214, 214);
+    lv_obj_center(btn->ring_inner);
+    lv_obj_set_style_radius(btn->ring_inner, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_opa(btn->ring_inner, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(btn->ring_inner, 1, 0);
+    lv_obj_set_style_border_color(btn->ring_inner, lv_color_hex(WILLI_GREEN_SOFT), 0);
+    lv_obj_set_style_border_opa(btn->ring_inner, LV_OPA_50, 0);
+    lv_obj_clear_flag(btn->ring_inner, LV_OBJ_FLAG_CLICKABLE);
+
+    btn->face = lv_obj_create(btn->start_btn);
+    lv_obj_remove_style_all(btn->face);
+    lv_obj_set_size(btn->face, START_BTN_FACE_W, START_BTN_FACE_H);
+    lv_obj_center(btn->face);
+    lv_obj_set_style_radius(btn->face, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(btn->face, lv_color_hex(WILLI_BG_FACE), 0);
+    lv_obj_set_style_bg_opa(btn->face, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(btn->face, 2, 0);
+    lv_obj_set_style_border_color(btn->face, lv_color_hex(WILLI_BORDER), 0);
+    lv_obj_set_style_border_opa(btn->face, LV_OPA_COVER, 0);
+    lv_obj_set_style_pad_all(btn->face, 0, 0);
+    lv_obj_set_style_shadow_color(btn->face, lv_color_black(), 0);
+    lv_obj_set_style_shadow_width(btn->face, 4, 0);
+    lv_obj_set_style_shadow_opa(btn->face, LV_OPA_20, 0);
+    lv_obj_clear_flag(btn->face, LV_OBJ_FLAG_CLICKABLE);
+
+    btn->icon = lv_label_create(btn->face);
+    lv_label_set_text(btn->icon, LV_SYMBOL_PLAY);
+    lv_obj_set_style_text_color(btn->icon, lv_color_white(), 0);
+    lv_obj_set_style_text_font(btn->icon, &lv_font_montserrat_28, 0);
+    lv_obj_align(btn->icon, LV_ALIGN_CENTER, 0, -34);
+    lv_obj_clear_flag(btn->icon, LV_OBJ_FLAG_CLICKABLE);
+
+    btn->title = lv_label_create(btn->face);
+    lv_label_set_text(btn->title, "COMENZAR");
+    lv_obj_set_style_text_color(btn->title, lv_color_white(), 0);
+    lv_obj_set_style_text_font(btn->title, &lv_font_montserrat_20, 0);
+    lv_obj_align(btn->title, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_clear_flag(btn->title, LV_OBJ_FLAG_CLICKABLE);
+
+    btn->line = lv_obj_create(btn->face);
+    lv_obj_remove_style_all(btn->line);
+    lv_obj_set_size(btn->line, 74, 2);
+    lv_obj_set_style_bg_color(btn->line, lv_color_hex(WILLI_GREEN), 0);
+    lv_obj_set_style_bg_opa(btn->line, LV_OPA_COVER, 0);
+    lv_obj_align(btn->line, LV_ALIGN_CENTER, 0, 24);
+    lv_obj_clear_flag(btn->line, LV_OBJ_FLAG_CLICKABLE);
+
+    btn->subtitle = lv_label_create(btn->face);
+    lv_label_set_text(btn->subtitle, "Libre");
+    lv_obj_set_style_text_color(btn->subtitle, lv_color_hex(WILLI_TEXT_SUB), 0);
+    lv_obj_set_style_text_font(btn->subtitle, &lv_font_montserrat_14, 0);
+    lv_obj_align(btn->subtitle, LV_ALIGN_CENTER, 0, 44);
+    lv_obj_clear_flag(btn->subtitle, LV_OBJ_FLAG_CLICKABLE);
+
+    lv_obj_add_event_cb(btn->start_btn, event_cb, LV_EVENT_ALL, btn);
+
+    willi_start_btn_apply_mode_visual(btn);
+    return btn;
+}
+
+lv_obj_t *willi_start_btn_get_root(willi_start_btn_t *btn)
+{
+    if(!btn) return NULL;
+    return btn->start_btn;
+}
+
+void willi_start_btn_set_title(willi_start_btn_t *btn, const char *txt)
+{
+    if(!btn || !btn->title) return;
+    lv_label_set_text(btn->title, txt ? txt : "");
+}
+
+void willi_start_btn_set_subtitle(willi_start_btn_t *btn, const char *txt)
+{
+    if(!btn || !btn->subtitle) return;
+    lv_label_set_text(btn->subtitle, txt ? txt : "");
+}
+
+void willi_start_btn_set_mode(willi_start_btn_t *btn, willi_start_mode_t mode)
+{
+    if(!btn) return;
+    if(btn->mode == mode) return;
+
+    btn->mode = mode;
+    willi_start_btn_apply_mode_visual(btn);
+}
+
+willi_start_mode_t willi_start_btn_get_mode(willi_start_btn_t *btn)
+{
+    if(!btn) return WILLI_START_MODE_FREE;
+    return btn->mode;
+}
+
+void willi_start_btn_set_pressed(willi_start_btn_t *btn, bool pressed)
+{
+    if(!btn) return;
+    if(btn->pressed == pressed) return;
+
+    btn->pressed = pressed;
+
+    lv_anim_t a;
+
+    if(pressed) {
+        if(btn->face) {
+            lv_anim_init(&a);
+            lv_anim_set_var(&a, btn->face);
+            lv_anim_set_exec_cb(&a, press_anim_y_cb);
+            lv_anim_set_values(&a, 0, 3);
+            lv_anim_set_time(&a, 90);
+            lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+            lv_anim_start(&a);
+
+            lv_anim_init(&a);
+            lv_anim_set_var(&a, btn->face);
+            lv_anim_set_exec_cb(&a, face_shadow_anim_cb);
+            lv_anim_set_values(&a, 4, 2);
+            lv_anim_set_time(&a, 90);
+            lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+            lv_anim_start(&a);
+        }
+
+        if(btn->line) {
+            lv_anim_init(&a);
+            lv_anim_set_var(&a, btn->line);
+            lv_anim_set_exec_cb(&a, obj_width_anim_cb);
+            lv_anim_set_values(&a, 74, 62);
+            lv_anim_set_time(&a, 90);
+            lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+            lv_anim_start(&a);
+        }
+
+        if(btn->glow_outer) {
+            lv_anim_init(&a);
+            lv_anim_set_var(&a, btn->glow_outer);
+            lv_anim_set_exec_cb(&a, glow_border_opa_anim_cb);
+            lv_anim_set_values(&a, LV_OPA_10, LV_OPA_10);
+            lv_anim_set_time(&a, 90);
+            lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+            lv_anim_start(&a);
+        }
+    }
+    else {
+        if(btn->face) {
+            lv_anim_init(&a);
+            lv_anim_set_var(&a, btn->face);
+            lv_anim_set_exec_cb(&a, press_anim_y_cb);
+            lv_anim_set_values(&a, 3, 0);
+            lv_anim_set_time(&a, 120);
+            lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+            lv_anim_start(&a);
+
+            lv_anim_init(&a);
+            lv_anim_set_var(&a, btn->face);
+            lv_anim_set_exec_cb(&a, face_shadow_anim_cb);
+            lv_anim_set_values(&a, 2, 4);
+            lv_anim_set_time(&a, 120);
+            lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+            lv_anim_start(&a);
+        }
+
+        if(btn->line) {
+            lv_anim_init(&a);
+            lv_anim_set_var(&a, btn->line);
+            lv_anim_set_exec_cb(&a, obj_width_anim_cb);
+            lv_anim_set_values(&a, 62, 74);
+            lv_anim_set_time(&a, 120);
+            lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+            lv_anim_start(&a);
+        }
+
+        if(btn->glow_outer) {
+            lv_anim_init(&a);
+            lv_anim_set_var(&a, btn->glow_outer);
+            lv_anim_set_exec_cb(&a, glow_border_opa_anim_cb);
+            lv_anim_set_values(&a, LV_OPA_10, LV_OPA_10);
+            lv_anim_set_time(&a, 120);
+            lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+            lv_anim_start(&a);
+        }
+    }
+}
+
+void willi_start_btn_start_breathing(willi_start_btn_t *btn)
+{
+    if(!btn || !btn->glow_outer) return;
+
+    lv_anim_t a;
+
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, btn->glow_outer);
+    lv_anim_set_exec_cb(&a, glow_border_opa_anim_cb);
+    lv_anim_set_values(&a, LV_OPA_10, LV_OPA_20);
+    lv_anim_set_time(&a, 1800);
+    lv_anim_set_playback_time(&a, 1800);
+    lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_set_path_cb(&a, lv_anim_path_ease_in_out);
+    lv_anim_start(&a);
+}
+
+void willi_start_btn_start_particles_anim(willi_start_btn_t *btn)
+{
+    LV_UNUSED(btn);
+}
+
+void willi_start_btn_start_spray_anim(willi_start_btn_t *btn)
+{
+    LV_UNUSED(btn);
+}

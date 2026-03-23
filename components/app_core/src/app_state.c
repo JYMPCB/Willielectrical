@@ -15,6 +15,7 @@ void app_state_init(void)
 
     g_app.start_req = false;
     g_app.stop_req = false;
+    g_app.exit_running_screen_req = false;
     g_app.speed_up_req = false;
     g_app.speed_down_req = false;
     g_app.mode_req = false;

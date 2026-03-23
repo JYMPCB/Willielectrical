@@ -1,6 +1,7 @@
 #include "handlebar_link.h"
 #include "bus_master.h"
 #include "vfd_link.h"
+#include "app_control.h"
 #include "pins_config.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -105,47 +106,36 @@ static void handle_event_drive_treadmill(const bus_event_item_t *ev)
 
     switch (ev->type) {
         case HANDLE_EV_START:
-            if (vfd_link_set_speed_kmh_x100(s_target_speed_x100) && vfd_link_start()) {
-                int64_t t_ack_us = esp_timer_get_time();
-                trace_cmd_start(HANDLE_EV_START, 1, t_event_us, t_ack_us);
-                ESP_LOGI(TAG, "cmd START ok, speed=%.2f km/h", (double)s_target_speed_x100 / 100.0);
-            } else {
-                ESP_LOGW(TAG, "cmd START failed");
-            }
+            app_request_start(APP_INPUT_HANDLEBAR);
+            ESP_LOGI(TAG, "req START forwarded to app_core");
             break;
 
         case HANDLE_EV_STOP:
-            if (vfd_link_stop()) {
-                int64_t t_ack_us = esp_timer_get_time();
-                trace_cmd_start(HANDLE_EV_STOP, 0, t_event_us, t_ack_us);
-                ESP_LOGI(TAG, "cmd STOP ok");
-            } else {
-                ESP_LOGW(TAG, "cmd STOP failed");
-            }
+            app_request_stop(APP_INPUT_HANDLEBAR);
+            ESP_LOGI(TAG, "req STOP forwarded to app_core");
             break;
 
         case HANDLE_EV_UP:
             s_target_speed_x100 = clamp_i32(s_target_speed_x100 + TREADMILL_SPEED_STEP_X100,
                                             TREADMILL_SPEED_MIN_X100,
                                             TREADMILL_SPEED_MAX_X100);
-            if (vfd_link_set_speed_kmh_x100(s_target_speed_x100)) {
-                ESP_LOGI(TAG, "cmd SPEED UP -> %.2f km/h", (double)s_target_speed_x100 / 100.0);
-            } else {
-                ESP_LOGW(TAG, "cmd SPEED UP failed (target=%.2f km/h)",
-                         (double)s_target_speed_x100 / 100.0);
-            }
+            app_request_speed_up(APP_INPUT_HANDLEBAR);
+            ESP_LOGI(TAG, "req SPEED UP forwarded to app_core (target=%.2f km/h)",
+                     (double)s_target_speed_x100 / 100.0);
             break;
 
         case HANDLE_EV_DOWN:
             s_target_speed_x100 = clamp_i32(s_target_speed_x100 - TREADMILL_SPEED_STEP_X100,
                                             TREADMILL_SPEED_MIN_X100,
                                             TREADMILL_SPEED_MAX_X100);
-            if (vfd_link_set_speed_kmh_x100(s_target_speed_x100)) {
-                ESP_LOGI(TAG, "cmd SPEED DOWN -> %.2f km/h", (double)s_target_speed_x100 / 100.0);
-            } else {
-                ESP_LOGW(TAG, "cmd SPEED DOWN failed (target=%.2f km/h)",
-                         (double)s_target_speed_x100 / 100.0);
-            }
+            app_request_speed_down(APP_INPUT_HANDLEBAR);
+            ESP_LOGI(TAG, "req SPEED DOWN forwarded to app_core (target=%.2f km/h)",
+                     (double)s_target_speed_x100 / 100.0);
+            break;
+
+        case HANDLE_EV_MODE:
+            app_request_mode_next(APP_INPUT_HANDLEBAR);
+            ESP_LOGI(TAG, "req MODE forwarded to app_core");
             break;
 
         default:

@@ -19,7 +19,7 @@ static inline uint32_t now_ms()
   return (uint32_t)(esp_timer_get_time() / 1000ULL);
 }
 
-
+/*
 void mathTask(void *pv)
 {
  
@@ -197,8 +197,46 @@ void mathTask(void *pv)
     xSemaphoreGive(g_ui_mutex);
   }
 }
+*/
 
-void speedTask(void *pv)
+//TAREAS PARA PRUEBAS
+volatile uint32_t g_gui_worstGap_ms = 0;
+volatile uint32_t g_gui_last_lv_us  = 0;
+volatile uint32_t g_gui_stack_hw    = 0;
+void logTask(void *){
+  for(;;){
+    ESP_LOGI(TAG, "[gui] worstGap=%lu ms lv=%lu us stackHW=%lu words",
+      (unsigned long)g_gui_worstGap_ms,
+      (unsigned long)g_gui_last_lv_us,
+      (unsigned long)g_gui_stack_hw
+    );
+    g_gui_worstGap_ms = 0;
+
+    /*Serial.printf("[flush] worst=%lu us last=%lu us\n",
+    (unsigned long)g_flush_worst_us, (unsigned long)g_flush_last_us);
+    g_flush_worst_us = 0;*/
+
+    ESP_LOGI(TAG, "[flush] count/s=%lu worst=%lu us worstArea=%ldx%ld",
+    (unsigned long)g_flush_count,
+    (unsigned long)g_flush_worst_us,
+    (long)g_flush_worst_w, (long)g_flush_worst_h
+    );
+    g_flush_count = 0;
+    g_flush_worst_us = 0;
+
+    ESP_LOGI(TAG, "[touch] count/s=%lu worst=%lu us last=%lu us",
+    (unsigned long)g_touch_count,
+    (unsigned long)g_touch_worst_us,
+    (unsigned long)g_touch_last_us
+    );
+    g_touch_count = 0;
+    g_touch_worst_us = 0;
+
+    vTaskDelay(pdMS_TO_TICKS(1000));
+  }
+}
+
+/*void speedTask(void *pv)
 {
   extern volatile bool g_workout_frozen;
 
@@ -338,11 +376,7 @@ void speedTask(void *pv)
     strlcpy(g_ui.ritmoStr, ritmoStr, sizeof(g_ui.ritmoStr));
     xSemaphoreGive(g_ui_mutex);
   }
-}
-
-volatile uint32_t g_gui_worstGap_ms = 0;
-volatile uint32_t g_gui_last_lv_us  = 0;
-volatile uint32_t g_gui_stack_hw    = 0;
+}*/
 
 void guiTask(void *pv)
 {
@@ -358,8 +392,9 @@ void guiTask(void *pv)
 
     lv_tick_inc(elapsed_ms);
 
-    // Devuelve ms hasta el próximo timer que LVGL necesita atender
+    int64_t lv_start_us = esp_timer_get_time();
     uint32_t wait_ms = display_port_lvgl_handler();
+    g_gui_last_lv_us = (uint32_t)(esp_timer_get_time() - lv_start_us);
 
     // Reducir frecuencia de refresh en escenarios de alta carga de bus (WiFi scan/OTA/config)
     // para evitar solapamiento en MIPI-DPI: "previous draw operation is not finished".
@@ -378,46 +413,43 @@ void guiTask(void *pv)
   }
 }
 
-//TAREAS PARA PRUEBAS
-void logTask(void *){
-  for(;;){
-    ESP_LOGI(TAG, "[gui] worstGap=%lu ms lv=%lu us stackHW=%lu words",
-      (unsigned long)g_gui_worstGap_ms,
-      (unsigned long)g_gui_last_lv_us,
-      (unsigned long)g_gui_stack_hw
-    );
-    g_gui_worstGap_ms = 0;
+/*void guiTask(void *pv)
+{
+    ESP_LOGI(TAG, "guiTask started");
 
-    /*Serial.printf("[flush] worst=%lu us last=%lu us\n",
-    (unsigned long)g_flush_worst_us, (unsigned long)g_flush_last_us);
-    g_flush_worst_us = 0;*/
+    uint32_t last_tick_ms = now_ms();
 
-    ESP_LOGI(TAG, "[flush] count/s=%lu worst=%lu us worstArea=%ldx%ld",
-    (unsigned long)g_flush_count,
-    (unsigned long)g_flush_worst_us,
-    (long)g_flush_worst_w, (long)g_flush_worst_h
-    );
-    g_flush_count = 0;
-    g_flush_worst_us = 0;
+    for(;;) {
+        uint32_t now_tick_ms = now_ms();
+        uint32_t elapsed_ms = now_tick_ms - last_tick_ms;
+        last_tick_ms = now_tick_ms;
+        if (elapsed_ms == 0) elapsed_ms = 1;
 
-    ESP_LOGI(TAG, "[touch] count/s=%lu worst=%lu us last=%lu us",
-    (unsigned long)g_touch_count,
-    (unsigned long)g_touch_worst_us,
-    (unsigned long)g_touch_last_us
-    );
-    g_touch_count = 0;
-    g_touch_worst_us = 0;
+        g_gui_stack_hw = (uint32_t)uxTaskGetStackHighWaterMark(NULL);
 
-    vTaskDelay(pdMS_TO_TICKS(1000));
-  }
-}
+        //ESP_LOGI(TAG, "before lv_tick_inc");
+        lv_tick_inc(elapsed_ms);
+
+        //ESP_LOGI(TAG, "before lv_timer_handler");
+        uint32_t wait_ms = display_port_lvgl_handler();
+
+        //ESP_LOGI(TAG, "after lv_timer_handler, wait_ms=%lu", (unsigned long)wait_ms);
+
+        if(wait_ms > 16) wait_ms = 16;
+        if(wait_ms < 2)  wait_ms = 2;
+
+        vTaskDelay(pdMS_TO_TICKS(wait_ms));
+    }
+}*/
 
 void startTasks()
 {
-  BaseType_t rc = xTaskCreatePinnedToCore(guiTask, "gui", 12288, NULL, 4, NULL, 1);
-  if (rc != pdPASS) {
-    ESP_LOGE(TAG, "Failed to create gui task");
-  }
+    BaseType_t rc = xTaskCreate(guiTask, "gui", 12288, NULL, 4, NULL);
+    if (rc != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create gui task");
+    } else {
+        ESP_LOGI(TAG, "gui task created");
+    }
   //xTaskCreatePinnedToCore(mathTask,  "math",  4096, NULL, 3, &g_mathTaskHandle,  0);
   //xTaskCreatePinnedToCore(speedTask, "speed", 4096, NULL, 3, &g_speedTaskHandle, 0);
 }

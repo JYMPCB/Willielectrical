@@ -1,9 +1,9 @@
 #include "app_control.h"
+#include <stdio.h>
 
 bool app_can_start(void)
 {
     printf("START clicked\n");
-    return (g_app.train_state == TRAIN_STATE_IDLE);
     if(g_app.error_active) return false;
     if(!g_app.safety_key_ok) return false;
     if(!g_app.vfd_ready) return false;
@@ -27,6 +27,12 @@ void app_request_stop(app_input_src_t src)
 {
     g_app.last_input_src = src;
     g_app.stop_req = true;
+}
+
+void app_request_exit_running_screen(app_input_src_t src)
+{
+    g_app.last_input_src = src;
+    g_app.exit_running_screen_req = true;
 }
 
 void app_request_speed_up(app_input_src_t src)

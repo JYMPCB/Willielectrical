@@ -1,9 +1,17 @@
 #include "app_logic.h"
 #include "app_state.h"
 #include "app_control.h"
+#include "vfd_link.h"
 #include "lvgl.h"
+#include <stdio.h>
 
 #define APP_START_UI_DELAY_MS   600U
+
+static int32_t kmh_to_x100(float kmh)
+{
+    if(kmh < 0.0f) kmh = 0.0f;
+    return (int32_t)(kmh * 100.0f + 0.5f);
+}
 
 static void app_prepare_session(void)
 {
@@ -109,6 +117,10 @@ static void app_process_speed_up(void)
         g_app.target_speed_kmh = 18.0f;
     }
 
+    if(!vfd_link_set_speed_kmh_x100(kmh_to_x100(g_app.target_speed_kmh))) {
+        printf("app_process_speed_up: vfd set speed failed\n");
+    }
+
     g_app.ui_req_running_refresh = true;
 }
 
@@ -124,6 +136,10 @@ static void app_process_speed_down(void)
         g_app.target_speed_kmh = 0.5f;
     }
 
+    if(!vfd_link_set_speed_kmh_x100(kmh_to_x100(g_app.target_speed_kmh))) {
+        printf("app_process_speed_down: vfd set speed failed\n");
+    }
+
     g_app.ui_req_running_refresh = true;
 }
 
@@ -135,6 +151,29 @@ static void app_process_mode(void)
     app_cycle_mode();
 }
 
+static void app_process_exit_running_screen(void)
+{
+    if(!g_app.exit_running_screen_req) return;
+
+    if(g_app.train_state == TRAIN_STATE_RUNNING ||
+       g_app.train_state == TRAIN_STATE_STARTING) {
+        g_app.stop_req = true;
+        return;
+    }
+
+    if(g_app.train_state == TRAIN_STATE_STOPPING) {
+        return;
+    }
+
+    if(g_app.ui_show_running_screen) {
+        g_app.ui_show_running_screen = false;
+        g_app.ui_req_home_refresh = true;
+        g_app.ui_req_screen_change = true;
+    }
+
+    g_app.exit_running_screen_req = false;
+}
+
 static void app_update_state_machine(void)
 {
     switch(g_app.train_state) {
@@ -143,14 +182,20 @@ static void app_update_state_machine(void)
                lv_tick_elaps(g_app.start_sequence_ms) >= APP_START_UI_DELAY_MS) {
 
                 g_app.start_hw_sent = true;
+                bool hw_ok = true;
+                if(!vfd_link_set_speed_kmh_x100(kmh_to_x100(g_app.target_speed_kmh))) {
+                    printf("app_update_state_machine: vfd set speed failed\n");
+                    hw_ok = false;
+                }
+                if(!vfd_link_start()) {
+                    printf("app_update_state_machine: vfd start failed\n");
+                    hw_ok = false;
+                }
 
-                /* Más adelante:
-                 * - mandar start real al VFD
-                 * - avisar a handlebarlink
-                 * - esperar confirmación real
-                 *
-                 * Por ahora simulamos arranque correcto.
-                 */
+                if(!hw_ok) {
+                    printf("app_update_state_machine: fallback to simulated RUNNING\n");
+                }
+
                 g_app.current_speed_kmh = g_app.target_speed_kmh;
                 g_app.train_state = TRAIN_STATE_RUNNING;
                 g_app.ui_req_running_refresh = true;
@@ -163,15 +208,22 @@ static void app_update_state_machine(void)
             break;
 
         case TRAIN_STATE_STOPPING:
-            /* Más adelante: esperar confirmación real del VFD */
+            (void)vfd_link_set_speed_kmh_x100(0);
+            if(!vfd_link_stop()) {
+                printf("app_update_state_machine: vfd stop failed\n");
+            }
             g_app.current_speed_kmh = 0.0f;
             g_app.train_state = TRAIN_STATE_IDLE;
-            g_app.ui_show_running_screen = false;
             g_app.start_hw_sent = false;
+
+            if(g_app.exit_running_screen_req) {
+                g_app.ui_show_running_screen = false;
+                g_app.exit_running_screen_req = false;
+                g_app.ui_req_screen_change = true;
+            }
 
             g_app.ui_req_home_refresh = true;
             g_app.ui_req_running_refresh = true;
-            g_app.ui_req_screen_change = true;
             break;
 
         case TRAIN_STATE_IDLE:
@@ -187,12 +239,13 @@ void app_logic_init(void)
 
 void app_logic_process(void)
 {
-    printf("app_logic_process running start_req=%d\n", g_app.start_req);
+    //printf("app_logic_process running start_req=%d\n", g_app.start_req);
     app_process_start();
     app_process_stop();
     app_process_speed_up();
     app_process_speed_down();
     app_process_mode();
+    app_process_exit_running_screen();
 
     app_update_state_machine();
 }

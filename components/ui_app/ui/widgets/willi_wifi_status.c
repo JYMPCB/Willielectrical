@@ -1,11 +1,12 @@
 #include "willi_wifi_status.h"
-#include "lvgl/src/misc/lv_timer_private.h"
+#include <stdbool.h>
 
 #define C_WIFI 0xEAF3FF
 
 static void set_hidden(lv_obj_t *obj, bool hidden)
 {
     if(!obj) return;
+
     if(hidden) lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
 }
@@ -30,7 +31,7 @@ static void wifi_apply_phase(willi_wifi_status_t *w)
 
 static void wifi_timer_cb(lv_timer_t *t)
 {
-    willi_wifi_status_t *w = (willi_wifi_status_t *)t->user_data;
+    willi_wifi_status_t *w = (willi_wifi_status_t *)lv_timer_get_user_data(t);
     if(!w) return;
 
     w->phase = (w->phase + 1) % 6;
@@ -79,7 +80,7 @@ void willi_wifi_status_stop(willi_wifi_status_t *w)
     if(!w) return;
 
     if(w->timer) {
-        lv_timer_del(w->timer);
+        lv_timer_delete(w->timer);
         w->timer = NULL;
     }
 }

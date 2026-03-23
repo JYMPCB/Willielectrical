@@ -121,10 +121,23 @@ bool vfd_link_start(void)
 
 bool vfd_link_stop(void)
 {
+    bool speed_zero_ok = vfd_link_set_speed_kmh_x100(0);
+
     bus_packet_t rsp;
     bool ok = request_simple(BUS_CMD_STOP_ACTION, &rsp, 50);
 
     if (!ok || rsp.cmd != BUS_CMD_ACK || rsp.len < sizeof(bus_ack_payload_t)) {
+        if(!speed_zero_ok) {
+            speed_zero_ok = vfd_link_set_speed_kmh_x100(0);
+        }
+
+        if(speed_zero_ok) {
+            ESP_LOGW(TAG, "STOP_ACTION no ACK, fallback speed=0 applied");
+            s_ctx.online = true;
+            s_ctx.ok_count++;
+            return true;
+        }
+
         s_ctx.online = false;
         s_ctx.fail_count++;
         return false;
@@ -134,6 +147,18 @@ bool vfd_link_stop(void)
     memcpy(&ack, rsp.data, sizeof(ack));
 
     if (ack.ack_cmd != BUS_CMD_STOP_ACTION) {
+        if(!speed_zero_ok) {
+            speed_zero_ok = vfd_link_set_speed_kmh_x100(0);
+        }
+
+        if(speed_zero_ok) {
+            ESP_LOGW(TAG, "STOP_ACTION ACK mismatch, fallback speed=0 applied (ack_cmd=0x%02X)",
+                     (unsigned)ack.ack_cmd);
+            s_ctx.online = true;
+            s_ctx.ok_count++;
+            return true;
+        }
+
         s_ctx.fail_count++;
         return false;
     }

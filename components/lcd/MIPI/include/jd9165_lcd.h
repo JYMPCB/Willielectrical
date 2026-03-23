@@ -1,6 +1,7 @@
 #ifndef _JD9165_LCD_H
 #define _JD9165_LCD_H
 
+#include <cstddef>
 #include <stdio.h>
 #include <stdint.h>
 

@@ -40,6 +40,7 @@ typedef struct {
 
     bool start_req;
     bool stop_req;
+    bool exit_running_screen_req;
     bool speed_up_req;
     bool speed_down_req;
     bool mode_req;

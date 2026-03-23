@@ -1,5 +1,7 @@
 #ifndef _GT911_TOUCH_H
 #define _GT911_TOUCH_H
+
+#include <stdint.h>
 #include <stdio.h>
 
 class gt911_touch
