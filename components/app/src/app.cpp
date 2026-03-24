@@ -14,12 +14,13 @@ extern "C" {
 #include "esp_private/esp_clk.h"
 
 #define EN_DISPLAY 1
-#define EN_AUDIO   0
+#define EN_AUDIO   1
 #define EN_TASKS   1
-#define EN_WIFI    0
+#define EN_WIFI    1
 #define EN_RS485   1
 #define EN_SERVICES 0
 #define EN_TI 0
+#define EN_OTA 1
 
 #if EN_DISPLAY
 #include "display_port.h"
@@ -36,6 +37,12 @@ extern "C" {
 #endif
 #if EN_WIFI
 #include "wifi_mgr.h"
+#endif
+#if EN_OTA
+#include "ota_mgr.h"
+#endif
+#if EN_WIFI && EN_OTA
+#include "mdns.h"
 #endif
 #if EN_RS485
 #include "handlebar_link.h"
@@ -106,7 +113,7 @@ void app_init(void)
 
 #if EN_AUDIO
     audio_init();
-    audio_set_volume(95);
+    audio_set_volume(86);
 #endif
 
 #if EN_TASKS
@@ -120,6 +127,39 @@ void app_init(void)
 
 #if EN_WIFI
     wifi_mgr_start_task();
+#endif
+
+#if EN_WIFI && EN_OTA
+    auto ota_bootstrap_task = [](void *arg) {
+        (void)arg;
+        const uint32_t wait_step_ms = 200;
+
+        while (!wifi_ok) {
+            vTaskDelay(pdMS_TO_TICKS(wait_step_ms));
+        }
+
+        // mDNS: responde a willihmi.local en la red local
+        mdns_init();
+        mdns_hostname_set("willihmi");
+        mdns_instance_name_set("Willi HMI");
+        mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
+        ESP_LOGI(TAG, "mDNS activo: willihmi.local:80");
+
+        ota_local_start();
+        ota_check_async();
+        vTaskDelete(NULL);
+    };
+
+    BaseType_t ota_rc = xTaskCreatePinnedToCore(ota_bootstrap_task,
+                                                 "ota_boot",
+                                                 4096,
+                                                 NULL,
+                                                 2,
+                                                 NULL,
+                                                 0);
+    if (ota_rc != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create ota bootstrap task");
+    }
 #endif
 
 #if EN_RS485

@@ -12,6 +12,7 @@ void ui_home_sync_with_app(void);
 
 void ui_home_set_clock_text(const char *txt);
 void ui_home_set_wifi_connected(bool connected);
+void ui_home_set_wifi_signal(uint8_t level);
 void ui_home_set_metrics(float current_speed_kmh,
                          float target_speed_kmh,
                          uint32_t elapsed_time_s,

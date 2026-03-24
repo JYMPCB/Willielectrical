@@ -9,6 +9,8 @@ idf_component_register(
   REQUIRES
     willi_common
     app
+    app_core
     display_port
+    vfd_link
 
 )

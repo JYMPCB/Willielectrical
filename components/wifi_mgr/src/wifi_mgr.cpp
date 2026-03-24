@@ -3,6 +3,8 @@
 
 #include "wifi_mgr.h"
 #include "app_globals.h"
+#include "wifi_test_credentials.h"
+#include "app_state.h"
 
 #include "esp_log.h"
 #include "esp_event.h"
@@ -39,10 +41,21 @@ static bool s_scan_running = false;
 static uint32_t s_reconn_t0 = 0;
 static const uint32_t RECONN_EVERY_MS = 5000;
 static bool s_allow_reconnect = false;
+static uint32_t s_rssi_poll_t0 = 0;
+static const uint32_t RSSI_POLL_MS = 2000;
 
 // SNTP (en IDF podés dejarlo para tu módulo de hora; acá solo marcamos habLocalTime si querés)
 static bool s_sntp_started = false;
 static const char *LOCAL_TZ = "UTC+3";
+
+static uint8_t wifi_signal_level_from_rssi(int8_t rssi_dbm)
+{
+  if (rssi_dbm <= -90) return 0;
+  if (rssi_dbm <= -80) return 1;
+  if (rssi_dbm <= -70) return 2;
+  if (rssi_dbm <= -60) return 3;
+  return 4;
+}
 
 static void refresh_cfg_mac_fw(void)
 {
@@ -79,14 +92,21 @@ static void set_globals_disconnected(void)
   wifi_ok = false;
   strlcpy(cfg_ssid, "SIN RED", sizeof(cfg_ssid));
   strlcpy(cfg_ip,   "0.0.0.0", sizeof(cfg_ip));
+
+  g_app.wifi_connected = false;
+  g_app.wifi_rssi_dbm = -127;
+  g_app.wifi_signal_level = 0;
+  g_app.ui_req_topbar_refresh = true;
 }
 
 static void set_globals_connected_from_netif(void)
 {
   // SSID
   wifi_ap_record_t ap{};
+  int8_t rssi = -127;
   if (esp_wifi_sta_get_ap_info(&ap) == ESP_OK) {
     strlcpy(cfg_ssid, (const char*)ap.ssid, sizeof(cfg_ssid));
+    rssi = ap.rssi;
   }
 
   // IP
@@ -101,6 +121,11 @@ static void set_globals_connected_from_netif(void)
   }
 
   wifi_ok = true;
+
+  g_app.wifi_connected = true;
+  g_app.wifi_rssi_dbm = rssi;
+  g_app.wifi_signal_level = wifi_signal_level_from_rssi(rssi);
+  g_app.ui_req_topbar_refresh = true;
 
   // Si querés, acá arrancás SNTP IDF (o lo dejás para otro módulo)
   if (!s_sntp_started) {
@@ -302,6 +327,27 @@ esp_err_t wifi_mgr_init(void)
     strlcpy(pending_pass, (const char*)saved_wc.sta.password, sizeof(pending_pass));
   }
 
+  bool has_test_sta = (WIFI_TEST_SSID[0] != '\0');
+  bool use_test_sta = has_test_sta && (WIFI_TEST_OVERRIDE_SAVED || !has_saved_sta);
+
+  if (use_test_sta) {
+    wifi_config_t wc{};
+    strlcpy((char*)wc.sta.ssid, WIFI_TEST_SSID, sizeof(wc.sta.ssid));
+    strlcpy((char*)wc.sta.password, WIFI_TEST_PASS, sizeof(wc.sta.password));
+    wc.sta.pmf_cfg.capable = true;
+    wc.sta.pmf_cfg.required = false;
+
+    esp_err_t set_cfg_err = esp_wifi_set_config(WIFI_IF_STA, &wc);
+    if (set_cfg_err == ESP_OK) {
+      has_saved_sta = true;
+      strlcpy(pending_ssid, WIFI_TEST_SSID, sizeof(pending_ssid));
+      strlcpy(pending_pass, WIFI_TEST_PASS, sizeof(pending_pass));
+      ESP_LOGI(TAG, "test WiFi credentials loaded for SSID '%s'", pending_ssid);
+    } else {
+      ESP_LOGW(TAG, "failed to apply test WiFi credentials: %s", esp_err_to_name(set_cfg_err));
+    }
+  }
+
   // MAC + FW en globals (como tu enter_config)
   refresh_cfg_mac_fw();
 
@@ -379,6 +425,25 @@ static void wifi_maintenance(void)
   esp_wifi_connect();
 }
 
+static void wifi_poll_rssi(void)
+{
+  if (!wifi_ok) return;
+
+  uint32_t now = now_ms();
+  if (now - s_rssi_poll_t0 < RSSI_POLL_MS) return;
+  s_rssi_poll_t0 = now;
+
+  wifi_ap_record_t ap{};
+  if (esp_wifi_sta_get_ap_info(&ap) != ESP_OK) return;
+
+  uint8_t lvl = wifi_signal_level_from_rssi(ap.rssi);
+  if (g_app.wifi_rssi_dbm != ap.rssi || g_app.wifi_signal_level != lvl) {
+    g_app.wifi_rssi_dbm = ap.rssi;
+    g_app.wifi_signal_level = lvl;
+    g_app.ui_req_topbar_refresh = true;
+  }
+}
+
 // --- task: reemplaza wifi_mgr_loop() ---
 static void wifi_mgr_task(void *pv)
 {
@@ -424,6 +489,7 @@ static void wifi_mgr_task(void *pv)
     // Si NO estás en config: mantenimiento + apagar server si estaba
     if (!habConfig) {
       wifi_maintenance();
+      wifi_poll_rssi();
       vTaskDelay(pdMS_TO_TICKS(100));
       continue;
     }
@@ -529,6 +595,8 @@ static void wifi_mgr_task(void *pv)
         snprintf(cfg_info, sizeof(cfg_info), "Conectando... (%lus)", (unsigned long)(elapsed/1000));
       }
     }
+
+    wifi_poll_rssi();
 
     vTaskDelay(pdMS_TO_TICKS(100));
   }

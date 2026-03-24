@@ -171,6 +171,30 @@ static void home_stop_event_cb(lv_event_t *e)
     app_request_stop(APP_INPUT_UI);
 }
 
+static void home_speed_minus_event_cb(lv_event_t *e)
+{
+    if(lv_event_get_code(e) != LV_EVENT_RELEASED) return;
+    app_request_speed_down(APP_INPUT_UI);
+}
+
+static void home_speed_plus_event_cb(lv_event_t *e)
+{
+    if(lv_event_get_code(e) != LV_EVENT_RELEASED) return;
+    app_request_speed_up(APP_INPUT_UI);
+}
+
+static void home_pace_minus_event_cb(lv_event_t *e)
+{
+    if(lv_event_get_code(e) != LV_EVENT_RELEASED) return;
+    app_request_pace_down(APP_INPUT_UI);
+}
+
+static void home_pace_plus_event_cb(lv_event_t *e)
+{
+    if(lv_event_get_code(e) != LV_EVENT_RELEASED) return;
+    app_request_pace_up(APP_INPUT_UI);
+}
+
 /* --------------------------------------------------------- */
 /* ANIM HELPERS                                              */
 /* --------------------------------------------------------- */
@@ -475,8 +499,8 @@ lv_obj_t *ui_home_create(void)
     lv_obj_align(title, LV_ALIGN_TOP_LEFT, 24, 18);
 
     willi_wifi_status_create(scr, &s_wifi, 0, 0);
-    willi_wifi_status_hide(&s_wifi);
-    willi_wifi_status_stop(&s_wifi);
+    willi_wifi_status_show(&s_wifi);
+    willi_wifi_status_set_strength(&s_wifi, 0);
 
     s_clock_label = lv_label_create(scr);
     lv_label_set_text(s_clock_label, "10:45 AM");
@@ -543,6 +567,11 @@ lv_obj_t *ui_home_create(void)
     lv_obj_add_event_cb(home_stop_root(),  home_stop_event_cb,  LV_EVENT_CLICKED, NULL);
     lv_obj_add_event_cb(s_btn_back,        home_back_event_cb,  LV_EVENT_CLICKED, NULL);
 
+    lv_obj_add_event_cb(willi_stepper_btn_get_minus_zone(s_btn_speed), home_speed_minus_event_cb, LV_EVENT_RELEASED, NULL);
+    lv_obj_add_event_cb(willi_stepper_btn_get_plus_zone(s_btn_speed),  home_speed_plus_event_cb,  LV_EVENT_RELEASED, NULL);
+    lv_obj_add_event_cb(willi_stepper_btn_get_minus_zone(s_btn_pace),  home_pace_minus_event_cb,  LV_EVENT_RELEASED, NULL);
+    lv_obj_add_event_cb(willi_stepper_btn_get_plus_zone(s_btn_pace),   home_pace_plus_event_cb,   LV_EVENT_RELEASED, NULL);
+
     home_apply_mode(HOME_MODE_FREE);
     home_restore_idle_layout();
 
@@ -557,13 +586,15 @@ void ui_home_set_clock_text(const char *txt)
 
 void ui_home_set_wifi_connected(bool connected)
 {
-    if(connected) {
-        willi_wifi_status_start(&s_wifi);
-        willi_wifi_status_show(&s_wifi);
-    } else {
-        willi_wifi_status_stop(&s_wifi);
-        willi_wifi_status_hide(&s_wifi);
+    willi_wifi_status_show(&s_wifi);
+    if(!connected) {
+        willi_wifi_status_set_strength(&s_wifi, 0);
     }
+}
+
+void ui_home_set_wifi_signal(uint8_t level)
+{
+    willi_wifi_status_set_strength(&s_wifi, level);
 }
 
 void ui_home_set_metrics(float current_speed_kmh,

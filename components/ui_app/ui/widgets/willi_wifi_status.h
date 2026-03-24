@@ -14,3 +14,4 @@ void willi_wifi_status_show(willi_wifi_status_t *w);
 void willi_wifi_status_hide(willi_wifi_status_t *w);
 void willi_wifi_status_start(willi_wifi_status_t *w);
 void willi_wifi_status_stop(willi_wifi_status_t *w);
+void willi_wifi_status_set_strength(willi_wifi_status_t *w, uint8_t level);

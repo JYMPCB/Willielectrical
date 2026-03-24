@@ -14,7 +14,8 @@ static const char *TAG = "handlebar_link";
 #define TREADMILL_SPEED_STEP_X100      50
 #define TREADMILL_SPEED_MIN_X100       100
 #define TREADMILL_SPEED_MAX_X100       2200
-#define HANDLEBAR_POLL_MS              20
+#define HANDLEBAR_POLL_MS              80
+#define HANDLEBAR_PING_PERIOD_MS       400
 #define CMD_TRACE_TIMEOUT_US           3000000LL
 
 static int32_t s_target_speed_x100 = TREADMILL_SPEED_MIN_X100;
@@ -103,6 +104,11 @@ static void handle_event_drive_treadmill(const bus_event_item_t *ev)
     }
 
     int64_t t_event_us = esp_timer_get_time();
+    handlebar_status_t hb_status;
+    uint8_t mode = HANDLE_MODE_SPEED;
+    if (handlebar_link_get_status(&hb_status)) {
+        mode = hb_status.mode;
+    }
 
     switch (ev->type) {
         case HANDLE_EV_START:
@@ -119,18 +125,28 @@ static void handle_event_drive_treadmill(const bus_event_item_t *ev)
             s_target_speed_x100 = clamp_i32(s_target_speed_x100 + TREADMILL_SPEED_STEP_X100,
                                             TREADMILL_SPEED_MIN_X100,
                                             TREADMILL_SPEED_MAX_X100);
-            app_request_speed_up(APP_INPUT_HANDLEBAR);
-            ESP_LOGI(TAG, "req SPEED UP forwarded to app_core (target=%.2f km/h)",
-                     (double)s_target_speed_x100 / 100.0);
+            if (mode == HANDLE_MODE_PACE) {
+                app_request_pace_up(APP_INPUT_HANDLEBAR);
+                ESP_LOGI(TAG, "req PACE UP forwarded to app_core");
+            } else {
+                app_request_speed_up(APP_INPUT_HANDLEBAR);
+                ESP_LOGI(TAG, "req SPEED UP forwarded to app_core (target=%.2f km/h)",
+                         (double)s_target_speed_x100 / 100.0);
+            }
             break;
 
         case HANDLE_EV_DOWN:
             s_target_speed_x100 = clamp_i32(s_target_speed_x100 - TREADMILL_SPEED_STEP_X100,
                                             TREADMILL_SPEED_MIN_X100,
                                             TREADMILL_SPEED_MAX_X100);
-            app_request_speed_down(APP_INPUT_HANDLEBAR);
-            ESP_LOGI(TAG, "req SPEED DOWN forwarded to app_core (target=%.2f km/h)",
-                     (double)s_target_speed_x100 / 100.0);
+            if (mode == HANDLE_MODE_PACE) {
+                app_request_pace_down(APP_INPUT_HANDLEBAR);
+                ESP_LOGI(TAG, "req PACE DOWN forwarded to app_core");
+            } else {
+                app_request_speed_down(APP_INPUT_HANDLEBAR);
+                ESP_LOGI(TAG, "req SPEED DOWN forwarded to app_core (target=%.2f km/h)",
+                         (double)s_target_speed_x100 / 100.0);
+            }
             break;
 
         case HANDLE_EV_MODE:
@@ -353,19 +369,26 @@ void handlebar_link_task(void *arg)
     bool info_read = false;
     bool was_offline = false;
     TickType_t last_offline_log = 0;
+    TickType_t last_ping_tick = 0;
 
     while (1) {
-        if (!handlebar_link_ping()) {
-            TickType_t now = xTaskGetTickCount();
-            if ((now - last_offline_log) >= pdMS_TO_TICKS(3000)) {
-                last_offline_log = now;
-                ESP_LOGW(TAG, "handlebar offline (ok=%lu fail=%lu)",
-                         (unsigned long)s_ctx.ok_count,
-                         (unsigned long)s_ctx.fail_count);
+        TickType_t now = xTaskGetTickCount();
+        bool need_ping = (!s_ctx.online) ||
+                         ((now - last_ping_tick) >= pdMS_TO_TICKS(HANDLEBAR_PING_PERIOD_MS));
+
+        if (need_ping) {
+            last_ping_tick = now;
+            if (!handlebar_link_ping()) {
+                if ((now - last_offline_log) >= pdMS_TO_TICKS(3000)) {
+                    last_offline_log = now;
+                    ESP_LOGW(TAG, "handlebar offline (ok=%lu fail=%lu)",
+                             (unsigned long)s_ctx.ok_count,
+                             (unsigned long)s_ctx.fail_count);
+                }
+                was_offline = true;
+                vTaskDelay(pdMS_TO_TICKS(500));
+                continue;
             }
-            was_offline = true;
-            vTaskDelay(pdMS_TO_TICKS(500));
-            continue;
         }
 
         if (was_offline) {

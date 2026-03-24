@@ -1,5 +1,8 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // URL del manifest en GitHub Pages
 #ifndef OTA_MANIFEST_URL
@@ -30,3 +33,7 @@ void ota_start_async();
 
 // Opcional: para que UI pueda “cancelar” antes de flashear (simple)
 void ota_request_cancel();
+
+#ifdef __cplusplus
+}
+#endif

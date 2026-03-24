@@ -19,7 +19,7 @@
 
 static const char* TAG = "audio_mgr";
 static constexpr uint32_t CODEC_I2C_SCL_HZ = 100000;
-static constexpr float AUDIO_SW_GAIN = 1.6f;
+static constexpr float AUDIO_SW_GAIN = 0.85f;
 
 #define AUDIO_DEBUG 0
 
@@ -137,9 +137,11 @@ static void write_tone(float freq_hz, int ms, float amp /*0..1*/)
   const float w = 2.0f * (float)M_PI * freq_hz / (float)sr;
   const int fade = (int)(sr * 3 / 1000); // 3ms
 
-  int16_t buf[160 * 2]; // stereo interleaved
+  // Larger chunks reduce CPU/scheduler overhead and help avoid underruns.
+  static constexpr int CHUNK_FRAMES = 320;
+  int16_t buf[CHUNK_FRAMES * 2]; // stereo interleaved
   for(int n=0; n<total; ){
-    int frames = 160;
+    int frames = CHUNK_FRAMES;
     if(n + frames > total) frames = total - n;
 
     for(int i=0;i<frames;i++, n++){
@@ -161,7 +163,7 @@ static void write_tone(float freq_hz, int ms, float amp /*0..1*/)
     }
 
     size_t bw = 0;
-    esp_err_t err = i2s_channel_write(s_tx, buf, frames * 2 * sizeof(int16_t), &bw, pdMS_TO_TICKS(200));
+    esp_err_t err = i2s_channel_write(s_tx, buf, frames * 2 * sizeof(int16_t), &bw, portMAX_DELAY);
     if(err != ESP_OK){
       ESP_LOGE(TAG, "i2s write failed: %s", esp_err_to_name(err));
       return;
@@ -183,8 +185,31 @@ static void play_evt(audio_evt_t e)
       vTaskDelay(pdMS_TO_TICKS(40));
       write_tone(1600.0f, 120, 0.45f);
       break;
-    case AUDIO_EVT_PAUSE:
-      write_tone(900.0f, 180, 0.40f);
+    case AUDIO_EVT_STOP:
+      write_tone(1000.0f, 90, 0.45f);
+      vTaskDelay(pdMS_TO_TICKS(30));
+      write_tone(700.0f, 140, 0.45f);
+      break;
+    case AUDIO_EVT_SPEED_UP:
+      write_tone(1700.0f, 55, 0.45f);
+      break;
+    case AUDIO_EVT_SPEED_DOWN:
+      write_tone(1200.0f, 70, 0.45f);
+      break;
+    case AUDIO_EVT_PACE_UP:
+      write_tone(1450.0f, 40, 0.40f);
+      vTaskDelay(pdMS_TO_TICKS(20));
+      write_tone(1850.0f, 50, 0.40f);
+      break;
+    case AUDIO_EVT_PACE_DOWN:
+      write_tone(1850.0f, 40, 0.40f);
+      vTaskDelay(pdMS_TO_TICKS(20));
+      write_tone(1450.0f, 50, 0.40f);
+      break;
+    case AUDIO_EVT_MODE:
+      write_tone(950.0f, 50, 0.42f);
+      vTaskDelay(pdMS_TO_TICKS(20));
+      write_tone(1250.0f, 50, 0.42f);
       break;
     case AUDIO_EVT_ERROR:
       for(int i=0;i<3;i++){
@@ -247,8 +272,8 @@ void audio_init()
   }
 
   // Queue/task
-  if(!s_q) s_q = xQueueCreate(8, sizeof(audio_evt_t));
-  if(!s_task) xTaskCreatePinnedToCore(audio_task, "audio", 4096, nullptr, 3, &s_task, 0);
+  if(!s_q) s_q = xQueueCreate(16, sizeof(audio_evt_t));
+  if(!s_task) xTaskCreatePinnedToCore(audio_task, "audio", 6144, nullptr, 5, &s_task, 1);
 
   s_ok = true;
   ESP_LOGI(TAG, "audio_init ok");

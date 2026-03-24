@@ -9,6 +9,7 @@
 static const char *TAG = "vfd_link";
 
 #define VFD_PING_PERIOD_MS 400
+#define VFD_STATUS_POLL_MS 150
 
 typedef struct {
     bool inited;
@@ -81,7 +82,7 @@ bool vfd_link_read_info(void)
 bool vfd_link_read_status(void)
 {
     bus_packet_t rsp;
-    bool ok = request_simple(BUS_CMD_GET_STATUS, &rsp, 50);
+    bool ok = request_simple(BUS_CMD_GET_STATUS, &rsp, 70);
 
     if (!ok || rsp.cmd != BUS_CMD_STATUS_REPLY || rsp.len < sizeof(vfd_status_t)) {
         s_ctx.online = false;
@@ -307,6 +308,6 @@ void vfd_link_task(void *arg)
             }
         }
 
-        vTaskDelay(pdMS_TO_TICKS(100));
+        vTaskDelay(pdMS_TO_TICKS(VFD_STATUS_POLL_MS));
     }
 }

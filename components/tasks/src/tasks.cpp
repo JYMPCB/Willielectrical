@@ -8,15 +8,154 @@
 #include <lvgl.h>
 
 #include "app_globals.h"
+#include "app_state.h"
 #include "training_interval.h"
 #include "display_port.h"
 #include "rgb_gpio.h"
+#include "vfd_link.h"
 
 static const char* TAG = "tasks";
 
 static inline uint32_t now_ms()
 {
   return (uint32_t)(esp_timer_get_time() / 1000ULL);
+}
+
+static float clampf_local(float v, float lo, float hi)
+{
+  if (v < lo) return lo;
+  if (v > hi) return hi;
+  return v;
+}
+
+static float pick_effective_speed_kmh(const vfd_status_t *st)
+{
+  if (!st) {
+    return 0.0f;
+  }
+
+  float actual_kmh = clampf_local(((float)st->actual_speed_kmh_x100) / 100.0f, 0.0f, 25.0f);
+  float target_kmh = clampf_local(((float)st->target_speed_kmh_x100) / 100.0f, 0.0f, 25.0f);
+
+  bool running_hint = (st->run_fb != 0) ||
+                      (st->run_cmd != 0) ||
+                      (st->state == VFD_STATE_RUNNING);
+
+  if (actual_kmh >= 0.2f) {
+    return actual_kmh;
+  }
+
+  if (running_hint && target_kmh >= 0.2f) {
+    return target_kmh;
+  }
+
+  return 0.0f;
+}
+
+// Approximation for treadmill kcal estimation based on speed bands.
+static float kcal_per_kg_per_km(float speed_kmh)
+{
+  if (speed_kmh < 4.0f) return 0.70f;
+  if (speed_kmh < 6.0f) return 0.80f;
+  if (speed_kmh < 8.0f) return 0.90f;
+  if (speed_kmh < 10.0f) return 0.98f;
+  return 1.05f;
+}
+
+void mathTask(void *pv)
+{
+  (void)pv;
+
+  const TickType_t period = pdMS_TO_TICKS(200);
+  TickType_t last_wake = xTaskGetTickCount();
+  uint32_t last_ms = now_ms();
+
+  uint32_t elapsed_acc_ms = 0;
+  float calories_frac = 0.0f;
+  train_state_t prev_state = g_app.train_state;
+
+  for(;;) {
+    vTaskDelayUntil(&last_wake, period);
+
+    uint32_t now = now_ms();
+    uint32_t dt_ms = now - last_ms;
+    last_ms = now;
+
+    if (dt_ms > 2000U) {
+      dt_ms = 200U;
+    }
+
+    if (g_reset_req) {
+      g_reset_req = false;
+      g_app.elapsed_time_s = 0;
+      g_app.distance_km = 0.0f;
+      g_app.calories = 0;
+      g_app.current_speed_kmh = 0.0f;
+      elapsed_acc_ms = 0;
+      calories_frac = 0.0f;
+      g_kcal_total_live = 0.0f;
+      g_app.ui_req_running_refresh = true;
+      continue;
+    }
+
+    if (g_app.train_state != prev_state) {
+      if (g_app.train_state == TRAIN_STATE_RUNNING) {
+        elapsed_acc_ms = 0;
+        calories_frac = 0.0f;
+      }
+
+      if (g_app.train_state == TRAIN_STATE_IDLE) {
+        g_app.current_speed_kmh = 0.0f;
+      }
+
+      prev_state = g_app.train_state;
+      g_app.ui_req_running_refresh = true;
+    }
+
+    vfd_status_t st;
+    bool have_status = vfd_link_get_status(&st);
+
+    if (g_app.train_state == TRAIN_STATE_RUNNING || g_app.train_state == TRAIN_STATE_STARTING) {
+      if (have_status) {
+        g_app.current_speed_kmh = pick_effective_speed_kmh(&st);
+      } else {
+        // Ultimate fallback to avoid freezing metrics if status is temporarily unavailable.
+        g_app.current_speed_kmh = clampf_local(g_app.target_speed_kmh, 0.0f, 25.0f);
+      }
+    }
+
+    if (g_app.train_state == TRAIN_STATE_RUNNING) {
+      float speed_kmh = g_app.current_speed_kmh;
+      float delta_dist_km = speed_kmh * ((float)dt_ms / 3600000.0f);
+      if (delta_dist_km < 0.0f) {
+        delta_dist_km = 0.0f;
+      }
+
+      g_app.distance_km += delta_dist_km;
+
+      elapsed_acc_ms += dt_ms;
+      while (elapsed_acc_ms >= 1000U) {
+        elapsed_acc_ms -= 1000U;
+        g_app.elapsed_time_s++;
+      }
+
+      float kcal_coeff = kcal_per_kg_per_km(speed_kmh);
+      calories_frac += delta_dist_km * peso * kcal_coeff;
+
+      if (calories_frac >= 1.0f) {
+        uint32_t add = (uint32_t)calories_frac;
+        g_app.calories += add;
+        calories_frac -= (float)add;
+      }
+
+      g_kcal_total_live = (float)g_app.calories + calories_frac;
+      g_app.ui_req_running_refresh = true;
+    } else {
+      elapsed_acc_ms = 0;
+      calories_frac = 0.0f;
+      g_kcal_total_live = (float)g_app.calories;
+    }
+  }
 }
 
 /*
@@ -450,7 +589,12 @@ void startTasks()
     } else {
         ESP_LOGI(TAG, "gui task created");
     }
-  //xTaskCreatePinnedToCore(mathTask,  "math",  4096, NULL, 3, &g_mathTaskHandle,  0);
+    rc = xTaskCreatePinnedToCore(mathTask, "math", 4096, NULL, 3, &g_mathTaskHandle, 0);
+    if (rc != pdPASS) {
+      ESP_LOGE(TAG, "Failed to create math task");
+    } else {
+      ESP_LOGI(TAG, "math task created");
+    }
   //xTaskCreatePinnedToCore(speedTask, "speed", 4096, NULL, 3, &g_speedTaskHandle, 0);
 }
 

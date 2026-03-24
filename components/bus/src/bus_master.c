@@ -15,6 +15,12 @@ static SemaphoreHandle_t s_req_mutex = NULL;
 
 static char s_last_rx_diag[160] = "none";
 
+static bool is_transient_rx_diag(void)
+{
+    return (strncmp(s_last_rx_diag, "timeout-header", strlen("timeout-header")) == 0) ||
+           (strncmp(s_last_rx_diag, "timeout-body", strlen("timeout-body")) == 0);
+}
+
 static void set_last_rx_diag(const char *msg)
 {
     if (!msg) {
@@ -326,28 +332,56 @@ bool bus_master_request(uint8_t dest,
                         int timeout_ms)
 {
     bool ok = false;
+    int lock_wait_ms = timeout_ms + 150;
+
+    if (lock_wait_ms < 150) {
+        lock_wait_ms = 150;
+    }
 
     if (!s_inited || !rx_pkt) {
         log_req_fail("not-inited-or-null-rx", dest, cmd, 0, NULL);
         return false;
     }
 
-    if (s_req_mutex == NULL || xSemaphoreTake(s_req_mutex, pdMS_TO_TICKS(timeout_ms + 50)) != pdTRUE) {
+    if (s_req_mutex == NULL || xSemaphoreTake(s_req_mutex, pdMS_TO_TICKS(lock_wait_ms)) != pdTRUE) {
         log_req_fail("lock-timeout", dest, cmd, 0, NULL);
         return false;
     }
 
-    // Discard stale bytes from a previous transaction before issuing a new request.
-    uart_flush_input(s_cfg.uart_num);
-
     uint8_t seq = 0;
-    if (!bus_master_send(dest, cmd, tx_data, tx_len, &seq)) {
-        log_req_fail("tx-failed", dest, cmd, seq, NULL);
+    bus_packet_t pkt;
+    bool got_reply = false;
+
+    for (int attempt = 0; attempt < 2; attempt++) {
+        // Discard stale bytes from a previous transaction before issuing a request/retry.
+        uart_flush_input(s_cfg.uart_num);
+
+        if (!bus_master_send(dest, cmd, tx_data, tx_len, &seq)) {
+            log_req_fail("tx-failed", dest, cmd, seq, NULL);
+            goto done;
+        }
+
+        if (bus_master_recv(&pkt, timeout_ms)) {
+            got_reply = true;
+            break;
+        }
+
+        if (attempt == 0 && is_transient_rx_diag()) {
+            ESP_LOGD(TAG,
+                     "transient rx fail dest=0x%02X cmd=0x%02X seq=%u diag=%s, retrying",
+                     (unsigned)dest,
+                     (unsigned)cmd,
+                     (unsigned)seq,
+                     s_last_rx_diag);
+            vTaskDelay(pdMS_TO_TICKS(2));
+            continue;
+        }
+
+        log_req_fail("rx-timeout-or-parse", dest, cmd, seq, NULL);
         goto done;
     }
 
-    bus_packet_t pkt;
-    if (!bus_master_recv(&pkt, timeout_ms)) {
+    if (!got_reply) {
         log_req_fail("rx-timeout-or-parse", dest, cmd, seq, NULL);
         goto done;
     }

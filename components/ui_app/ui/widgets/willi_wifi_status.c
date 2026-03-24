@@ -29,6 +29,40 @@ static void wifi_apply_phase(willi_wifi_status_t *w)
     lv_obj_set_style_text_opa(w->label, opa, 0);
 }
 
+static void wifi_apply_strength(willi_wifi_status_t *w, uint8_t level)
+{
+    if(!w || !w->label) return;
+
+    lv_opa_t opa;
+    lv_color_t col;
+
+    switch(level) {
+        case 0:
+            opa = LV_OPA_30;
+            col = lv_color_hex(0x6F7A87);
+            break;
+        case 1:
+            opa = LV_OPA_60;
+            col = lv_color_hex(0x9FB3C9);
+            break;
+        case 2:
+            opa = LV_OPA_80;
+            col = lv_color_hex(0xBDD7F1);
+            break;
+        case 3:
+            opa = LV_OPA_90;
+            col = lv_color_hex(0xD7EEFF);
+            break;
+        default:
+            opa = LV_OPA_COVER;
+            col = lv_color_hex(0xEAF3FF);
+            break;
+    }
+
+    lv_obj_set_style_text_opa(w->label, opa, 0);
+    lv_obj_set_style_text_color(w->label, col, 0);
+}
+
 static void wifi_timer_cb(lv_timer_t *t)
 {
     willi_wifi_status_t *w = (willi_wifi_status_t *)lv_timer_get_user_data(t);
@@ -68,19 +102,16 @@ void willi_wifi_status_hide(willi_wifi_status_t *w)
 
 void willi_wifi_status_start(willi_wifi_status_t *w)
 {
-    if(!w) return;
-
-    if(!w->timer) {
-        w->timer = lv_timer_create(wifi_timer_cb, 180, w);
-    }
+    (void)w;
 }
 
 void willi_wifi_status_stop(willi_wifi_status_t *w)
 {
-    if(!w) return;
+    (void)w;
+}
 
-    if(w->timer) {
-        lv_timer_delete(w->timer);
-        w->timer = NULL;
-    }
+void willi_wifi_status_set_strength(willi_wifi_status_t *w, uint8_t level)
+{
+    if (level > 4) level = 4;
+    wifi_apply_strength(w, level);
 }

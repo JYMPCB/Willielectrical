@@ -12,12 +12,16 @@ void app_state_init(void)
     g_app.error_active = false;
     g_app.vfd_ready = true;
     g_app.wifi_connected = false;
+    g_app.wifi_rssi_dbm = -127;
+    g_app.wifi_signal_level = 0;
 
     g_app.start_req = false;
     g_app.stop_req = false;
     g_app.exit_running_screen_req = false;
     g_app.speed_up_req = false;
     g_app.speed_down_req = false;
+    g_app.pace_up_req = false;
+    g_app.pace_down_req = false;
     g_app.mode_req = false;
 
     g_app.current_speed_kmh = 0.0f;

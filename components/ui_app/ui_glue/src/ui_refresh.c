@@ -14,6 +14,7 @@ static lv_timer_t *s_ui_refresh_timer = NULL;
 
 static char s_last_time_str[8] = "";
 static bool s_last_wifi_ok = false;
+static uint8_t s_last_wifi_level = 0xFF;
 
 static float s_last_speed_kmh = -9999.0f;
 static float s_last_target_kmh = -9999.0f;
@@ -123,6 +124,11 @@ static void ui_refresh_topbar(void)
         ui_home_set_wifi_connected(g_app.wifi_connected);
     }
 
+    if(g_app.wifi_signal_level != s_last_wifi_level) {
+        s_last_wifi_level = g_app.wifi_signal_level;
+        ui_home_set_wifi_signal(g_app.wifi_signal_level);
+    }
+
     g_app.ui_req_topbar_refresh = false;
 }
 
@@ -210,6 +216,7 @@ void ui_refresh_init(void)
 
     s_last_time_str[0] = '\0';
     s_last_wifi_ok = false;
+    s_last_wifi_level = 0xFF;
 
     s_last_speed_kmh = -9999.0f;
     s_last_target_kmh = -9999.0f;

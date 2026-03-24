@@ -12,10 +12,12 @@ idf_component_register(
     handlebar_link
     vfd_link
     wifi_mgr
+    ota
     training
     service
     ui_app
     app_core
     driver
     esp_driver_i2c
+    espressif__mdns
 )

@@ -47,6 +47,18 @@ void app_request_speed_down(app_input_src_t src)
     g_app.speed_down_req = true;
 }
 
+void app_request_pace_up(app_input_src_t src)
+{
+    g_app.last_input_src = src;
+    g_app.pace_up_req = true;
+}
+
+void app_request_pace_down(app_input_src_t src)
+{
+    g_app.last_input_src = src;
+    g_app.pace_down_req = true;
+}
+
 void app_request_mode_next(app_input_src_t src)
 {
     g_app.last_input_src = src;

@@ -37,12 +37,16 @@ typedef struct {
     bool error_active;
     bool vfd_ready;
     bool wifi_connected;
+    int8_t wifi_rssi_dbm;
+    uint8_t wifi_signal_level;
 
     bool start_req;
     bool stop_req;
     bool exit_running_screen_req;
     bool speed_up_req;
     bool speed_down_req;
+    bool pace_up_req;
+    bool pace_down_req;
     bool mode_req;
 
     float current_speed_kmh;

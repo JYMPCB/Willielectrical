@@ -2,15 +2,26 @@
 #include "app_state.h"
 #include "app_control.h"
 #include "vfd_link.h"
+#include "audio_mgr.h"
 #include "lvgl.h"
 #include <stdio.h>
 
 #define APP_START_UI_DELAY_MS   600U
 
+#define APP_MIN_SPEED_KMH       0.5f
+#define APP_MAX_SPEED_KMH       18.0f
+
 static int32_t kmh_to_x100(float kmh)
 {
     if(kmh < 0.0f) kmh = 0.0f;
     return (int32_t)(kmh * 100.0f + 0.5f);
+}
+
+static float clampf_local(float v, float lo, float hi)
+{
+    if (v < lo) return lo;
+    if (v > hi) return hi;
+    return v;
 }
 
 static void app_prepare_session(void)
@@ -81,6 +92,7 @@ static void app_process_start(void)
     g_app.ui_show_running_screen = true;
     g_app.start_sequence_ms = lv_tick_get();
     g_app.start_hw_sent = false;
+    audio_play(AUDIO_EVT_START);
 
     printf("app_process_start: STARTING OK\n");
 
@@ -101,6 +113,7 @@ static void app_process_stop(void)
     g_app.target_speed_kmh = 0.0f;
     g_app.start_hw_sent = false;
     g_app.train_state = TRAIN_STATE_STOPPING;
+    audio_play(AUDIO_EVT_STOP);
 
     g_app.ui_req_running_refresh = true;
 }
@@ -113,13 +126,13 @@ static void app_process_speed_up(void)
     if(g_app.train_state != TRAIN_STATE_RUNNING) return;
 
     g_app.target_speed_kmh += 0.5f;
-    if(g_app.target_speed_kmh > 18.0f) {
-        g_app.target_speed_kmh = 18.0f;
-    }
+    g_app.target_speed_kmh = clampf_local(g_app.target_speed_kmh, APP_MIN_SPEED_KMH, APP_MAX_SPEED_KMH);
 
     if(!vfd_link_set_speed_kmh_x100(kmh_to_x100(g_app.target_speed_kmh))) {
         printf("app_process_speed_up: vfd set speed failed\n");
     }
+
+    audio_play(AUDIO_EVT_SPEED_UP);
 
     g_app.ui_req_running_refresh = true;
 }
@@ -132,13 +145,53 @@ static void app_process_speed_down(void)
     if(g_app.train_state != TRAIN_STATE_RUNNING) return;
 
     g_app.target_speed_kmh -= 0.5f;
-    if(g_app.target_speed_kmh < 0.5f) {
-        g_app.target_speed_kmh = 0.5f;
-    }
+    g_app.target_speed_kmh = clampf_local(g_app.target_speed_kmh, APP_MIN_SPEED_KMH, APP_MAX_SPEED_KMH);
 
     if(!vfd_link_set_speed_kmh_x100(kmh_to_x100(g_app.target_speed_kmh))) {
         printf("app_process_speed_down: vfd set speed failed\n");
     }
+
+    audio_play(AUDIO_EVT_SPEED_DOWN);
+
+    g_app.ui_req_running_refresh = true;
+}
+
+static void app_process_pace_up(void)
+{
+    if(!g_app.pace_up_req) return;
+    g_app.pace_up_req = false;
+
+    if(g_app.train_state != TRAIN_STATE_RUNNING) return;
+
+    // Ritmo +/- debe sentirse equivalente a velocidad +/- en respuesta.
+    g_app.target_speed_kmh += 0.5f;
+    g_app.target_speed_kmh = clampf_local(g_app.target_speed_kmh, APP_MIN_SPEED_KMH, APP_MAX_SPEED_KMH);
+
+    if(!vfd_link_set_speed_kmh_x100(kmh_to_x100(g_app.target_speed_kmh))) {
+        printf("app_process_pace_up: vfd set speed failed\n");
+    }
+
+    audio_play(AUDIO_EVT_PACE_UP);
+
+    g_app.ui_req_running_refresh = true;
+}
+
+static void app_process_pace_down(void)
+{
+    if(!g_app.pace_down_req) return;
+    g_app.pace_down_req = false;
+
+    if(g_app.train_state != TRAIN_STATE_RUNNING) return;
+
+    // Ritmo +/- debe sentirse equivalente a velocidad +/- en respuesta.
+    g_app.target_speed_kmh -= 0.5f;
+    g_app.target_speed_kmh = clampf_local(g_app.target_speed_kmh, APP_MIN_SPEED_KMH, APP_MAX_SPEED_KMH);
+
+    if(!vfd_link_set_speed_kmh_x100(kmh_to_x100(g_app.target_speed_kmh))) {
+        printf("app_process_pace_down: vfd set speed failed\n");
+    }
+
+    audio_play(AUDIO_EVT_PACE_DOWN);
 
     g_app.ui_req_running_refresh = true;
 }
@@ -148,6 +201,7 @@ static void app_process_mode(void)
     if(!g_app.mode_req) return;
     g_app.mode_req = false;
 
+    audio_play(AUDIO_EVT_MODE);
     app_cycle_mode();
 }
 
@@ -244,6 +298,8 @@ void app_logic_process(void)
     app_process_stop();
     app_process_speed_up();
     app_process_speed_down();
+    app_process_pace_up();
+    app_process_pace_down();
     app_process_mode();
     app_process_exit_running_screen();
 
