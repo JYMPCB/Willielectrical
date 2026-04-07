@@ -9,7 +9,7 @@
 #define APP_START_UI_DELAY_MS   600U
 
 #define APP_MIN_SPEED_KMH       0.5f
-#define APP_MAX_SPEED_KMH       18.0f
+#define APP_MAX_SPEED_KMH       19.8f
 
 static int32_t kmh_to_x100(float kmh)
 {
