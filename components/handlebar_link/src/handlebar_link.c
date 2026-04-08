@@ -13,7 +13,7 @@ static const char *TAG = "handlebar_link";
 
 #define TREADMILL_SPEED_STEP_X100      50
 #define TREADMILL_SPEED_MIN_X100       100
-#define TREADMILL_SPEED_MAX_X100       2200
+#define TREADMILL_SPEED_MAX_X100       2500
 #define HANDLEBAR_POLL_MS              80
 #define HANDLEBAR_PING_PERIOD_MS       400
 #define CMD_TRACE_TIMEOUT_US           3000000LL
